@@ -1,0 +1,7 @@
+Metadata-Version: 2.2
+Name: caglar_boyu_savas
+Version: 0.1
+Requires-Dist: PyQt5>=5.15.9
+Requires-Dist: PyQt5-Qt5>=5.15.2
+Requires-Dist: PyQt5-sip>=12.12.1
+Dynamic: requires-dist
