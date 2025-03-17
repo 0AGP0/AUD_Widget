@@ -30,7 +30,8 @@ class GroundWidget(QWidget):
             "ground": None,
             "castle": None,
             "tree": None,
-            "villager": {}
+            "villager": {},
+            "house": {}
         }
         
         # Resimleri yükle
@@ -46,7 +47,8 @@ class GroundWidget(QWidget):
                 "ground": None,
                 "castle": None,
                 "tree": None,
-                "villager": {}
+                "villager": {},
+                "house": {}
             }
             
             # Zemin resmini yükle
@@ -72,6 +74,16 @@ class GroundWidget(QWidget):
                 print(f"Ağaç resmi yüklendi: {tree_path}")
             else:
                 print(f"HATA: Ağaç resmi bulunamadı: {tree_path}")
+            
+            # Ev resimlerini yükle
+            house_types = ["ev1", "ev2", "ev3"]
+            for house_type in house_types:
+                house_path = os.path.join("src", "assets", f"{house_type}.png")
+                if os.path.exists(house_path):
+                    self.images["house"][house_type] = QPixmap(house_path)
+                    print(f"Ev resmi yüklendi: {house_path}")
+                else:
+                    print(f"UYARI: Ev resmi bulunamadı: {house_path}")
             
             # Köylü resimlerini yükle
             for gender in ["koylu", "kadin_koylu"]:
@@ -250,7 +262,7 @@ class GroundWidget(QWidget):
             scaled_castle = self.images["castle"].scaled(castle_width, castle_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
             # Kale pozisyonu - sol tarafta, zemin üzerinde
-            x = 100
+            x = 10
             # Zemin seviyesini hesapla
             ground_y = self.height() - self.ground_height
             # Kaleyi zemin üzerine yerleştir
@@ -362,26 +374,37 @@ class GroundWidget(QWidget):
                 # Köylüyü çiz
                 painter.drawPixmap(x, y, scaled_img)
                 
+                # Yazı alanı genişliği (köylü genişliğinin 2 katı)
+                text_width = villager.width * 2
+                text_x = x - (text_width - villager.width) // 2  # Merkezle
+                
                 # Köylü ismini çiz
                 painter.setPen(Qt.white)
                 painter.setFont(QFont("Arial", 8))
                 painter.drawText(
-                    x, y - 15, villager.width, 15,
+                    text_x, y - 15, text_width, 15,
                     Qt.AlignCenter, villager.name
                 )
                 
                 # Köylü durumunu çiz
                 if hasattr(villager, 'state') and villager.state:
+                    # Durum yazısı için arka plan çiz
+                    state_rect = QRect(text_x, y - 30, text_width, 15)
+                    painter.fillRect(state_rect, QColor(0, 0, 0, 128))  # Yarı saydam siyah arka plan
+                    
                     painter.setPen(Qt.yellow)
                     painter.drawText(
-                        x, y - 30, villager.width, 15,
+                        state_rect,
                         Qt.AlignCenter, villager.state
                     )
                 else:
                     # Mesleğini göster
+                    profession_rect = QRect(text_x, y - 30, text_width, 15)
+                    painter.fillRect(profession_rect, QColor(0, 0, 0, 128))  # Yarı saydam siyah arka plan
+                    
                     painter.setPen(Qt.yellow)
                     painter.drawText(
-                        x, y - 30, villager.width, 15,
+                        profession_rect,
                         Qt.AlignCenter, villager.profession
                     )
                 
@@ -390,7 +413,7 @@ class GroundWidget(QWidget):
                     resource_text = f"{villager.carrying['type']}: {villager.carrying['amount']}"
                     painter.setPen(Qt.cyan)
                     painter.drawText(
-                        x, y + villager.height + 5, villager.width, 15,
+                        text_x, y + villager.height + 5, text_width, 15,
                         Qt.AlignCenter, resource_text
                     )
                 
@@ -399,7 +422,7 @@ class GroundWidget(QWidget):
                     money_text = f"{villager.money} altın"
                     painter.setPen(Qt.green)
                     painter.drawText(
-                        x, y + villager.height + 20, villager.width, 15,
+                        text_x, y + villager.height + 20, text_width, 15,
                         Qt.AlignCenter, money_text
                     )
                 
@@ -408,7 +431,7 @@ class GroundWidget(QWidget):
                     house_text = "Ev Sahibi"
                     painter.setPen(QColor(255, 165, 0))  # Turuncu
                     painter.drawText(
-                        x, y + villager.height + 35, villager.width, 15,
+                        text_x, y + villager.height + 35, text_width, 15,
                         Qt.AlignCenter, house_text
                     )
                 
@@ -459,63 +482,85 @@ class GroundWidget(QWidget):
                 x = int(house.x - house.width / 2)
                 y = int(house.y - house.height)
                 
-                # Ev tipine göre renk seç
-                if house.house_type == "ev1":
-                    color1 = QColor(255, 255, 224)  # Açık sarı
-                    color2 = QColor(139, 69, 19)    # Kahverengi (çatı)
-                elif house.house_type == "ev2":
-                    color1 = QColor(176, 224, 230)  # Açık mavi
-                    color2 = QColor(47, 79, 79)     # Koyu mavi (çatı)
-                elif house.house_type == "ev3":
-                    color1 = QColor(152, 251, 152)  # Açık yeşil
-                    color2 = QColor(34, 139, 34)    # Koyu yeşil (çatı)
-                elif house.house_type == "ev4":
-                    color1 = QColor(255, 182, 193)  # Açık pembe
-                    color2 = QColor(139, 0, 139)    # Mor (çatı)
+                # Ev tipine göre resmi seç
+                house_type = house.house_type
+                house_image = None
+                
+                if house_type in self.images["house"]:
+                    house_image = self.images["house"][house_type]
                 else:
-                    color1 = QColor(200, 200, 200)  # Gri
-                    color2 = QColor(100, 100, 100)  # Koyu gri (çatı)
+                    # Varsayılan ev resmi
+                    if self.images["house"]:
+                        house_image = next(iter(self.images["house"].values()), None)
                 
-                # Evin gövdesini çiz
-                house_body_height = int(house.height * 2/3)
-                house_body_y = y + house.height - house_body_height
-                
-                painter.setBrush(QBrush(color1))
-                painter.setPen(QPen(Qt.black, 2))
-                painter.drawRect(x, house_body_y, house.width, house_body_height)
-                
-                # Çatıyı çiz
-                roof_points = [
-                    QPoint(x, house_body_y),
-                    QPoint(x + house.width // 2, y),
-                    QPoint(x + house.width, house_body_y)
-                ]
-                painter.setBrush(QBrush(color2))
-                painter.drawPolygon(roof_points)
-                
-                # Kapıyı çiz
-                door_width = house.width // 4
-                door_height = house_body_height // 2
-                door_x = x + (house.width - door_width) // 2
-                door_y = house_body_y + house_body_height - door_height
-                
-                painter.setBrush(QBrush(QColor(139, 69, 19)))  # Kahverengi
-                painter.drawRect(door_x, door_y, door_width, door_height)
-                
-                # Pencereyi çiz
-                window_size = house.width // 5
-                window_x = x + (house.width - window_size) // 2
-                window_y = house_body_y + house_body_height // 4
-                
-                painter.setBrush(QBrush(QColor(173, 216, 230)))  # Açık mavi
-                painter.drawRect(window_x, window_y, window_size, window_size)
+                if house_image:
+                    # Evi çiz - int değerler kullanarak
+                    scaled_img = house_image.scaled(int(house.width), int(house.height), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    painter.drawPixmap(x, y, scaled_img)
+                else:
+                    # Resim yoksa basit bir ev çiz
+                    # Ev tipine göre renk seç
+                    if house.house_type == "ev1":
+                        color1 = QColor(255, 255, 224)  # Açık sarı
+                        color2 = QColor(139, 69, 19)    # Kahverengi (çatı)
+                    elif house.house_type == "ev2":
+                        color1 = QColor(176, 224, 230)  # Açık mavi
+                        color2 = QColor(47, 79, 79)     # Koyu mavi (çatı)
+                    elif house.house_type == "ev3":
+                        color1 = QColor(152, 251, 152)  # Açık yeşil
+                        color2 = QColor(34, 139, 34)    # Koyu yeşil (çatı)
+                    else:
+                        color1 = QColor(200, 200, 200)  # Gri
+                        color2 = QColor(100, 100, 100)  # Koyu gri (çatı)
+                    
+                    # Evin gövdesini çiz
+                    house_body_height = int(house.height * 2/3)
+                    house_body_y = y + house.height - house_body_height
+                    
+                    painter.setBrush(QBrush(color1))
+                    painter.setPen(QPen(Qt.black, 2))
+                    painter.drawRect(x, house_body_y, int(house.width), house_body_height)
+                    
+                    # Çatıyı çiz
+                    roof_points = [
+                        QPoint(x, house_body_y),
+                        QPoint(x + int(house.width // 2), y),
+                        QPoint(x + int(house.width), house_body_y)
+                    ]
+                    painter.setBrush(QBrush(color2))
+                    painter.drawPolygon(roof_points)
+                    
+                    # Kapıyı çiz
+                    door_width = int(house.width // 4)
+                    door_height = house_body_height // 2
+                    door_x = x + (int(house.width) - door_width) // 2
+                    door_y = house_body_y + house_body_height - door_height
+                    
+                    painter.setBrush(QBrush(QColor(139, 69, 19)))  # Kahverengi
+                    painter.drawRect(door_x, door_y, door_width, door_height)
+                    
+                    # Pencereyi çiz
+                    window_size = int(house.width // 5)
+                    window_x = x + (int(house.width) - window_size) // 2
+                    window_y = house_body_y + house_body_height // 4
+                    
+                    painter.setBrush(QBrush(QColor(173, 216, 230)))  # Açık mavi
+                    painter.drawRect(window_x, window_y, window_size, window_size)
                 
                 # Ev sahibi varsa, üzerine isim etiketi ekle
                 if house.owner:
+                    # Yazı alanı genişliği (ev genişliğinin 1.5 katı)
+                    text_width = int(house.width * 1.5)
+                    text_x = x - (text_width - int(house.width)) // 2  # Merkezle
+                    
+                    # Arka plan çiz
+                    owner_rect = QRect(text_x, y - 20, text_width, 20)
+                    painter.fillRect(owner_rect, QColor(0, 0, 0, 128))  # Yarı saydam siyah arka plan
+                    
                     painter.setPen(Qt.white)
                     painter.setFont(QFont("Arial", 8))
                     painter.drawText(
-                        x, y - 15, house.width, 15,
+                        owner_rect,
                         Qt.AlignCenter, f"{house.owner}'nin Evi"
                     )
                 
@@ -537,75 +582,110 @@ class GroundWidget(QWidget):
                 
             # Tüm inşaat alanlarını çiz
             for site in self.game_controller.building_sites:
-                # İnşaat alanı aktif değilse çizme
-                if not hasattr(site, 'is_active') or not site.is_active:
-                    continue
-                    
                 # İnşaat alanı konumunu hesapla
                 x = int(site.x - site.width / 2)
                 y = int(site.y - site.height)
                 
-                # Zemini çiz
-                ground_height = 20
-                ground_y = y + site.height - ground_height
+                # İnşaat alanı çerçevesini çiz
+                painter.setPen(QPen(Qt.black, 2, Qt.DashLine))
+                painter.setBrush(Qt.NoBrush)
+                painter.drawRect(x, y, int(site.width), int(site.height))
                 
-                painter.setBrush(QBrush(QColor(150, 75, 0)))  # Kahverengi
-                painter.setPen(QPen(Qt.black, 2))
-                painter.drawRect(x, ground_y, site.width, ground_height)
+                # İnşaat alanı zeminini çiz
+                ground_rect = QRect(x, y, int(site.width), int(site.height))
+                painter.fillRect(ground_rect, QColor(194, 178, 128, 100))  # Açık toprak rengi, yarı saydam
                 
-                # İskeleyi çiz
-                scaffold_color = QColor(160, 82, 45)  # Koyu kahverengi
-                
-                # Dikey kirişler
-                beam_width = 5
-                for beam_x in [x + 10, x + site.width - 15]:
-                    painter.setBrush(QBrush(scaffold_color))
-                    painter.drawRect(beam_x, y + 10, beam_width, site.height - 30)
-                
-                # Yatay kirişler
-                for beam_y in [y + 15, y + site.height // 2, y + site.height - 30]:
-                    painter.setBrush(QBrush(scaffold_color))
-                    painter.drawRect(x + 10, beam_y, site.width - 25, beam_width)
+                # İnşaat iskeletini çiz
+                if site.progress > 0:
+                    # İlerleme durumuna göre iskelet yüksekliği
+                    skeleton_height = int(site.height * min(site.progress / 100, 0.8))
+                    skeleton_y = y + int(site.height) - skeleton_height
+                    
+                    # İskelet çerçevesi
+                    painter.setPen(QPen(Qt.black, 2))
+                    painter.setBrush(QBrush(QColor(139, 69, 19, 150)))  # Kahverengi, yarı saydam
+                    painter.drawRect(x + 5, skeleton_y, int(site.width) - 10, skeleton_height)
+                    
+                    # İskelet çubukları
+                    painter.setPen(QPen(QColor(101, 67, 33), 3))  # Koyu kahverengi
+                    
+                    # Dikey çubuklar
+                    num_posts = 4
+                    post_spacing = site.width / (num_posts + 1)
+                    
+                    for i in range(1, num_posts + 1):
+                        post_x = x + int(i * post_spacing)
+                        painter.drawLine(post_x, skeleton_y, post_x, skeleton_y + skeleton_height)
+                    
+                    # Yatay çubuklar
+                    num_beams = 2
+                    beam_spacing = skeleton_height / (num_beams + 1)
+                    
+                    for i in range(1, num_beams + 1):
+                        beam_y = skeleton_y + int(i * beam_spacing)
+                        painter.drawLine(x + 5, beam_y, x + int(site.width) - 5, beam_y)
                 
                 # İnşaat malzemeleri
-                # Tuğlalar
-                brick_color = QColor(178, 34, 34)  # Kırmızı-kahverengi
-                for i in range(5):
-                    for j in range(2):
-                        painter.setBrush(QBrush(brick_color))
-                        painter.drawRect(x + 20 + i * 15, ground_y - 10 - j * 10, 12, 8)
-                
-                # Çimento torbası
-                painter.setBrush(QBrush(QColor(169, 169, 169)))  # Gri
-                painter.drawEllipse(x + site.width - 40, ground_y - 30, 25, 30)
-                
-                # İlerleme çubuğunu çiz
-                if hasattr(site, 'progress'):
-                    progress = site.progress
+                if site.progress < 100:
+                    # Kereste yığını
+                    wood_pile_width = int(site.width / 4)
+                    wood_pile_height = int(site.height / 6)
+                    wood_pile_x = x + int(site.width) - wood_pile_width - 5
+                    wood_pile_y = y + int(site.height) - wood_pile_height
                     
-                    # İlerleme çubuğu boyutları
-                    bar_width = site.width - 10
-                    bar_height = 10
-                    bar_x = x + 5
-                    bar_y = y - 15
+                    painter.setBrush(QBrush(QColor(139, 69, 19)))  # Kahverengi
+                    painter.setPen(QPen(Qt.black, 1))
+                    painter.drawRect(int(wood_pile_x), int(wood_pile_y), wood_pile_width, wood_pile_height)
                     
-                    # Arka planı çiz
-                    painter.setPen(Qt.black)
-                    painter.setBrush(QColor(50, 50, 50, 200))
-                    painter.drawRect(bar_x, bar_y, bar_width, bar_height)
-                    
-                    # İlerlemeyi çiz
-                    painter.setBrush(QColor(0, 200, 0, 200))
-                    painter.drawRect(bar_x, bar_y, int(bar_width * progress), bar_height)
+                    # Kereste çizgileri
+                    painter.setPen(QPen(QColor(101, 67, 33), 1))  # Koyu kahverengi
+                    for i in range(3):
+                        line_y = wood_pile_y + (i + 1) * wood_pile_height / 4
+                        painter.drawLine(int(wood_pile_x), int(line_y), int(wood_pile_x) + wood_pile_width, int(line_y))
                 
-                # İnşaatçı varsa, üzerine isim etiketi ekle
-                if hasattr(site, 'builder') and site.builder:
-                    painter.setPen(Qt.white)
-                    painter.setFont(QFont("Arial", 8))
-                    painter.drawText(
-                        x, y - 30, site.width, 15,
-                        Qt.AlignCenter, f"{site.builder.name} İnşa Ediyor"
-                    )
+                # İlerleme çubuğu
+                progress_height = 10
+                progress_y = y - progress_height - 5
+                
+                # Arka plan
+                painter.setBrush(QBrush(Qt.lightGray))
+                painter.setPen(QPen(Qt.black, 1))
+                painter.drawRect(x, progress_y, int(site.width), progress_height)
+                
+                # İlerleme
+                progress_width = int(site.width * site.progress / 100)
+                painter.setBrush(QBrush(Qt.green))
+                painter.setPen(Qt.NoPen)
+                painter.drawRect(x, progress_y, progress_width, progress_height)
+                
+                # İlerleme yüzdesi
+                painter.setPen(Qt.black)
+                painter.setFont(QFont("Arial", 8, QFont.Bold))
+                painter.drawText(
+                    x, progress_y, int(site.width), progress_height,
+                    Qt.AlignCenter, f"%{int(site.progress)}"
+                )
+                
+                # İnşaat bilgisi
+                info_y = progress_y - 20
+                info_height = 20
+                info_rect = QRect(x - 10, info_y, int(site.width) + 20, info_height)
+                
+                # Arka plan
+                painter.fillRect(info_rect, QColor(0, 0, 0, 128))  # Yarı saydam siyah
+                
+                # Bilgi metni
+                painter.setPen(Qt.white)
+                painter.setFont(QFont("Arial", 8))
+                
+                info_text = f"İnşaat Alanı: {site.house_type}"
+                if site.builder:
+                    info_text += f" - İnşaatçı: {site.builder}"
+                
+                painter.drawText(
+                    info_rect,
+                    Qt.AlignCenter, info_text
+                )
                 
         except Exception as e:
             print(f"HATA: İnşaat alanı çizim hatası: {e}")

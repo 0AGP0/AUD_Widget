@@ -14,8 +14,8 @@ class Villager:
     appearance: int = 0
     x: float = 0.0
     y: float = 0.0
-    width: int = 40  # Köylü genişliği
-    height: int = 40  # Köylü yüksekliği
+    width: int = 25  # Köylü genişliği (40'tan 20'ye düşürüldü)
+    height: int = 25  # Köylü yüksekliği (40'tan 20'ye düşürüldü)
     direction: int = 1  # 1 = sağa, -1 = sola
     direction_x: int = 1  # 1 = sağa, -1 = sola (çizim için)
     health: int = 100
@@ -358,13 +358,17 @@ class Villager:
                             return
                     else:  # İnşaat alanına doğru git
                         self.move_towards(site.x)
+                        self.state = "İnşaat Alanına Gidiyor"
                         print(f"{self.name} inşaat alanına doğru ilerliyor. Mesafe: {distance:.1f}")
                         return
             
             # Mevcut inşaat alanı yoksa ve kale envanterinde yeterli odun varsa yeni inşaat alanı oluştur
             if hasattr(self.game_controller, 'castle') and self.game_controller.castle:
                 castle = self.game_controller.castle
-                if castle.get_inventory().get('odun', 0) >= 20:
+                wood_amount = castle.get_inventory().get('odun', 0)
+                
+                # Kale envanterinde en az 20 odun olmalı
+                if wood_amount >= 20:
                     # Rastgele bir konum seç (kale civarında)
                     castle_x = self.game_controller.castle.x
                     min_x = castle_x + 200  # Kaleden en az 200 piksel uzakta
@@ -373,17 +377,26 @@ class Villager:
                     y = self.game_controller.ground_y
                     
                     # İnşaat alanı oluşturma şansı
-                    if random.random() < 0.3:  # %30 şans (daha önce daha düşüktü)
+                    if random.random() < 0.5:  # %50 şans (0.3'ten 0.5'e yükseltildi)
                         # İnşaat alanı oluştur
                         building_site = self.game_controller.create_building_site(x, y)
                         if building_site:
                             # İnşaat alanına git
                             self.move_towards(building_site.x)
+                            self.state = "Yeni İnşaat Alanına Gidiyor"
                             print(f"{self.name} yeni inşaat alanına doğru ilerliyor. Mesafe: {abs(building_site.x - self.x):.1f}")
                             return
+                else:
+                    # Yeterli odun yoksa durumu güncelle
+                    self.state = "Odun Bekleniyor"
+                    # Dolaşmaya devam et
+                    self.wander()
+                    print(f"{self.name} inşaat için yeterli odun bekliyor. Mevcut odun: {wood_amount}/20")
+                    return
             
             # İnşaat alanı bulunamadı veya oluşturulamadı, dolaş
             self.wander()
+            self.state = "Dolaşıyor (İnşaat Bekliyor)"
             
         except Exception as e:
             print(f"HATA: {self.name} inşaat alanı bulma hatası: {e}")
@@ -517,7 +530,7 @@ class Villager:
             if hasattr(self, 'game_controller') and self.game_controller and hasattr(self.game_controller, 'castle'):
                 castle = self.game_controller.castle
                 if castle:
-                    target_x = castle.get_entrance()[0]
+                    target_x = castle.x  # Direkt kalenin x konumuna git
                     # Eğer kaleye yakınsa durma
                     if abs(self.x - target_x) < 20:
                         self.is_moving = False

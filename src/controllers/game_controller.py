@@ -98,12 +98,12 @@ class GameController(QObject):
             
             # Binaları oluştur (şimdilik sadece kale)
             print("Kale oluşturuluyor...")
-            self.castle = Building(x=400, y=self.ground_y, width=150, height=150, building_type="castle")
+            self.castle = Building(x=0, y=self.ground_y, width=150, height=150, building_type="castle")
             print("Kale oluşturuldu")
             
-            # Kale envanterine başlangıç odun ekle
-            self.castle.add_to_inventory("odun", 100)
-            print("Kale envanterine 100 odun eklendi")
+            # Kale envanterine başlangıç odun ekle - 0 odunla başlasın
+            self.castle.add_to_inventory("odun", 0)
+            print("Kale envanterine 0 odun eklendi")
             
             # Ağaçları oluştur
             print("Ağaçlar oluşturuluyor...")
@@ -150,8 +150,8 @@ class GameController(QObject):
             tree_width = 80
             tree_height = 120
             
-            # Kale pozisyonu (varsayılan olarak x=100)
-            castle_x = 100
+            # Kale pozisyonu (varsayılan olarak x=0)
+            castle_x = 0
             
             # Ağaçların başlangıç pozisyonu (kaleden 200 piksel sağda)
             start_x = castle_x + 200
@@ -433,8 +433,8 @@ class GameController(QObject):
                 ground_y = ground_widget.height() - ground_widget.ground_height
             
             # Köylü boyutları - draw_villagers metoduyla aynı olmalı
-            villager_width = 40  # 60'dan 40'a düşürüldü
-            villager_height = 40  # 60'dan 40'a düşürüldü
+            villager_width = 25  # 40'tan 20'ye düşürüldü
+            villager_height = 25  # 40'tan 20'ye düşürüldü
             
             # Tüm köylüleri kontrol et
             for villager in self.villagers:
@@ -535,8 +535,8 @@ class GameController(QObject):
         try:
             for villager in self.villagers:
                 # Köylünün hedefini kaleye ayarla
-                villager.target_x = 100  # Kale x pozisyonu
-                villager.target_y = self.ground_y - 150  # Kale y pozisyonu
+                villager.target_x = self.castle.x  # Kale x pozisyonu
+                villager.target_y = self.ground_y  # Zemin seviyesi
                 villager.is_moving = True
                 villager.is_wandering = False  # Dolaşmayı durdur
                 
@@ -546,6 +546,13 @@ class GameController(QObject):
                         villager.target_tree.stop_cutting()
                     villager.is_cutting = False
                     villager.target_tree = None
+                
+                # Eğer inşaatçı ise inşaat işlemini durdur
+                if villager.profession == "İnşaatçı":
+                    if villager.target_building_site:
+                        villager.target_building_site.stop_construction()
+                    villager.is_building = False
+                    villager.target_building_site = None
                 
                 print(f"{villager.name} kaleye dönüyor")
             
@@ -647,8 +654,8 @@ class GameController(QObject):
                 screen_geo = desktop.screenGeometry(i)
                 total_width += screen_geo.width()
             
-            # Kale pozisyonu (varsayılan olarak x=100)
-            castle_x = 400
+            # Kale pozisyonu (varsayılan olarak x=0)
+            castle_x = 0
             # Ağaçların başlangıç pozisyonu (kaleden 200 piksel sağda)
             min_x = castle_x + 200
             max_x = total_width - 100  # Ekranın sağ kenarından 100 piksel içeride
@@ -710,12 +717,11 @@ class GameController(QObject):
     def create_building_site(self, x: float, y: float) -> BuildingSite:
         """İnşaat alanı oluştur"""
         try:
-            # İnşaat alanı boyutları
-            width = 100
-            height = 80
+            # Zemin seviyesini kullan
+            ground_y = self.ground_y
             
-            # İnşaat alanını oluştur
-            building_site = BuildingSite(x=x, y=y, width=width, height=height)
+            # İnşaat alanını oluştur (zemin seviyesinde)
+            building_site = BuildingSite(x=x, y=ground_y)
             
             # Sinyalleri bağla
             building_site.construction_finished.connect(self.on_construction_finished)
@@ -723,7 +729,7 @@ class GameController(QObject):
             # Listeye ekle
             self.building_sites.append(building_site)
             
-            print(f"İnşaat alanı oluşturuldu: ({x}, {y})")
+            print(f"İnşaat alanı oluşturuldu: ({x}, {ground_y}), Tip: {building_site.house_type}")
             return building_site
             
         except Exception as e:
@@ -737,10 +743,13 @@ class GameController(QObject):
         try:
             print(f"İnşaat tamamlandı: {building_site.id}")
             
-            # Ev oluştur
+            # Zemin seviyesini hesapla
+            ground_y = self.ground_y + 35
+            
+            # Ev oluştur - y değerini zemin seviyesi olarak ayarla
             house = House(
                 x=building_site.x,
-                y=building_site.y,
+                y=ground_y,  # Zemin seviyesine yerleştir
                 width=building_site.width,
                 height=building_site.height,
                 house_type=building_site.house_type
@@ -759,7 +768,11 @@ class GameController(QObject):
             # Ev satın alma işlemini başlat
             self.try_sell_house(house)
             
-            print(f"Ev oluşturuldu: {house.id}")
+            # Kontrol panelini güncelle
+            if hasattr(self, 'control_panel'):
+                self.control_panel.update_castle_inventory()
+            
+            print(f"Ev oluşturuldu: {house.id}, Tip: {house.house_type}, Konum: ({house.x}, {house.y})")
             
         except Exception as e:
             print(f"HATA: İnşaat tamamlama hatası: {e}")
@@ -835,5 +848,47 @@ class GameController(QObject):
             
         except Exception as e:
             print(f"HATA: Köylüler dolaşmaya başlatılamadı: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def go_home(self):
+        """Eve veya kaleye dön"""
+        try:
+            # Ev sahibiyse evine dön
+            if self.has_house and hasattr(self, 'game_controller') and self.game_controller:
+                house = self.game_controller.find_house_by_id(self.house_id)
+                if house:
+                    target_x = house.get_entrance()[0]
+                    # Eğer eve yakınsa durma
+                    if abs(self.x - target_x) < 20:
+                        self.is_moving = False
+                        self.state = "Evde"
+                        return
+                    # Eve doğru hareket et
+                    self.move_towards(target_x)
+                    self.state = "Eve Dönüyor"
+                    return
+            
+            # Ev sahibi değilse veya ev bulunamadıysa kaleye dön
+            if hasattr(self, 'game_controller') and self.game_controller and hasattr(self.game_controller, 'castle'):
+                castle = self.game_controller.castle
+                if castle:
+                    target_x = castle.get_entrance()[0]
+                    # Eğer kaleye yakınsa durma
+                    if abs(self.x - target_x) < 20:
+                        self.is_moving = False
+                        self.state = "Kalede"
+                        return
+                    # Kaleye doğru hareket et
+                    self.move_towards(target_x)
+                    self.state = "Kaleye Dönüyor"
+                    return
+            
+            # Kale de bulunamadıysa dolaş
+            self.wander()
+            self.state = "Dolaşıyor"
+            
+        except Exception as e:
+            print(f"HATA: {self.name} eve dönme hatası: {e}")
             import traceback
             traceback.print_exc() 

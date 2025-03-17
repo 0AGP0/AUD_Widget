@@ -76,7 +76,7 @@ class Tree(QObject):
                 game_controller = self.current_woodcutter.game_controller
                 if hasattr(game_controller, 'castle') and game_controller.castle:
                     game_controller.castle.add_to_inventory("odun", 10)
-                    print(f"Kale envanterine 10 odun eklendi!")
+                    print(f"Kale envanterine 10 odun eklendi! Toplam: {game_controller.castle.get_inventory().get('odun', 0)}")
                 else:
                     print("UYARI: Kale bulunamadı, odun eklenemedi!")
             else:
@@ -125,3 +125,36 @@ class Tree(QObject):
             self.x = self.original_x
             self.shake_offset = 0
             print(f"Ağaç {self.id} yeniden doğdu!")
+
+    def on_cut_finished(self):
+        """Ağaç kesimi tamamlandığında çağrılır"""
+        try:
+            print(f"Ağaç ID: {self.id} kesildi!")
+            
+            # Ağacı görünmez yap
+            self.is_visible = False
+            self.is_being_cut = False
+            
+            # Oduncuyu serbest bırak
+            woodcutter = self.current_woodcutter
+            self.current_woodcutter = None
+            
+            # Oduncunun kesme sayısını artır
+            if hasattr(woodcutter, 'trees_cut_today'):
+                woodcutter.trees_cut_today += 1
+                print(f"{woodcutter.name} bugün {woodcutter.trees_cut_today} ağaç kesti.")
+            
+            # Kale envanterine odun ekle
+            if hasattr(woodcutter, 'game_controller') and woodcutter.game_controller:
+                if hasattr(woodcutter.game_controller, 'castle') and woodcutter.game_controller.castle:
+                    castle = woodcutter.game_controller.castle
+                    castle.add_to_inventory("odun", 10)  # 20 yerine 10 odun ekle
+                    print(f"Kale envanterine 10 odun eklendi. Toplam: {castle.get_inventory().get('odun', 0)}")
+            
+            # Ağaç kaldırıldı sinyali gönder
+            self.tree_removed.emit(self)
+            
+        except Exception as e:
+            print(f"HATA: Ağaç kesimi tamamlama hatası: {e}")
+            import traceback
+            traceback.print_exc()
