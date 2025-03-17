@@ -58,14 +58,14 @@ def main():
         # GameController oluştur
         game_controller = GameController()
         
-        # Oyunu kur
-        game_controller.setup_game()
-        
         # Ana pencereyi oluştur
         main_window = MainWindow(game_controller)
         
         # GameController'a pencereyi ata
         game_controller.window = main_window
+        
+        # Oyunu kur
+        game_controller.setup_game()
         
         # Pencereyi göster
         main_window.show()

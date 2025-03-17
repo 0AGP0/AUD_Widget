@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QTransform
-from ..models.villager import Villager
+from ..models.villager import Villager, TestVillager
 import random
 import os
 
@@ -165,20 +165,15 @@ class GroundWidget(QWidget):
             import traceback
             traceback.print_exc()
             return None
-    
-    def paintEvent(self, event):
-        """Çizim olayı"""
-        # Statik değişken - çizim sayacı
-        if not hasattr(self, '_paint_count'):
-            self._paint_count = 0
-        self._paint_count += 1
         
+    def paintEvent(self, event):
+        """Widget'ı çiz"""
         try:
-            # Çizim zaten yapılıyorsa çık (rekürsif çağrıları önle)
+            # Çizim zaten devam ediyorsa çıkış yap
             if self.is_drawing:
-                print(f"UYARI: Rekürsif çizim önlendi (çağrı sayısı: {self._paint_count})")
+                print("UYARI: Çizim zaten devam ediyor")
                 return
-                
+            
             # Çizim başladı
             self.is_drawing = True
             
@@ -292,48 +287,30 @@ class GroundWidget(QWidget):
     def draw_trees(self, painter):
         """Ağaçları çiz"""
         try:
-            # Ağaç listesi yok veya boşsa çıkış yap
-            if not hasattr(self.game_controller, 'trees') or not self.game_controller.trees:
-                print("HATA: Ağaç listesi bulunamadı veya boş")
+            if not self.images["trees"]:
                 return
                 
-            # Ağaç resmi yüklü değilse çıkış yap
-            if not self.images["trees"]:
-                print("HATA: Ağaç resmi yüklenemediği için çizilemedi")
-                return
-            
-            # Zemin seviyesini hesapla
             ground_y = self.height() - self.ground_height
             
-            # Tüm ağaçlar için sabit boyut belirle
-            tree_width = 80
-            tree_height = 120
-            
-            # Ağaçları çiz
             for tree in self.game_controller.trees:
-                # Ağaç pozisyonunu hesapla
+                # Sadece görünür ağaçları çiz
+                if not tree.is_visible:
+                    continue
+                    
                 x = int(tree.x)
+                tree_width = 80
+                tree_height = 120
                 
-                # Ağacın y pozisyonunu zemine göre ayarla
+                # Ağacın y pozisyonunu köylülerle aynı hizaya getir
+                # Köylü yüksekliği 40 piksel, ağaç yüksekliği 80 piksel
                 # Ağacın alt kısmı zemin seviyesinde olsun
-                y = ground_y - tree_height + 40
+                y = ground_y - tree_height + 40  # +40 ile ağacı yukarı kaldırıyoruz
                 
-                # Ağaç resmini al - tek bir resim var, tür kontrolü yapma
-                img = self.images["trees"]
-                
-                # Ağaç resmini ölçeklendir - tüm ağaçlar aynı boyutta olsun
-                scaled_img = img.scaled(tree_width, tree_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                # Ağaç resmini ölçeklendir
+                scaled_img = self.images["trees"].scaled(tree_width, tree_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 
                 # Ağacı çiz
                 painter.drawPixmap(x - tree_width // 2, y, scaled_img)
-                
-                # Debug bilgisi - ağacın sınırlarını göster
-                painter.setPen(Qt.green)
-                painter.drawRect(x - tree_width // 2, y, tree_width, tree_height)
-                
-                # Debug bilgisi - ağacın koordinatlarını göster
-                debug_text = f"({int(tree.x)}, {int(y)})"
-                painter.drawText(x - 20, y + tree_height + 15, debug_text)
                 
         except Exception as e:
             print(f"HATA: Ağaç çizme hatası: {e}")
@@ -345,12 +322,10 @@ class GroundWidget(QWidget):
         try:
             # Köylü listesi yok veya boşsa çıkış yap
             if not hasattr(self.game_controller, 'villagers') or not self.game_controller.villagers:
-                print("HATA: Köylü listesi bulunamadı veya boş")
                 return
                 
             # Köylü resimleri yüklü değilse çıkış yap
             if not self.images["villagers"]["Erkek"] or not self.images["villagers"]["Kadın"]:
-                print("HATA: Köylü resimleri yüklenemediği için çizilemedi")
                 return
             
             # Zemin seviyesini hesapla
@@ -358,74 +333,41 @@ class GroundWidget(QWidget):
             
             # Köylüleri çiz
             for villager in self.game_controller.villagers:
-                # Köylü pozisyonunu hesapla - x pozisyonu aynı kalsın
+                # Köylü pozisyonunu hesapla
                 x = int(villager.x)
-                
-                # Köylü boyutları - daha küçük yap
-                villager_width = 40  # 60'dan 40'a düşürüldü
-                villager_height = 40  # 60'dan 40'a düşürüldü
-                
-                # Köylünün y pozisyonunu zemine göre ayarla
-                # Köylünün alt kısmı zemin seviyesinde olsun
+                villager_width = 40
+                villager_height = 40
                 y = ground_y - villager_height
                 
-                # Cinsiyete göre resmi seç ve görünüm özelliğine göre farklı resimler kullan
+                # Cinsiyete göre resmi seç
                 if villager.gender == "Erkek":
-                    # Görünüm indeksini kontrol et ve geçerli bir indeks olduğundan emin ol
                     appearance_index = min(villager.appearance, len(self.images["villagers"]["Erkek"]) - 1)
                     img = self.images["villagers"]["Erkek"][appearance_index]
                 else:
-                    # Görünüm indeksini kontrol et ve geçerli bir indeks olduğundan emin ol
                     appearance_index = min(villager.appearance, len(self.images["villagers"]["Kadın"]) - 1)
                     img = self.images["villagers"]["Kadın"][appearance_index]
                 
                 # Köylü resmini ölçeklendir
                 scaled_img = img.scaled(villager_width, villager_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 
+                # Eğilme animasyonunu uygula
+                transform = QTransform()
+                transform.rotate(villager.rotation)
+                scaled_img = scaled_img.transformed(transform)
+                
                 # Köylünün hareket yönüne göre resmi çevir
-                if villager.direction < 0:  # Sola hareket ediyorsa
-                    # Resmi yatay olarak çevir
+                if villager.direction < 0:
                     transform = QTransform().scale(-1, 1)
                     scaled_img = scaled_img.transformed(transform)
                 
                 # Köylüyü çiz
                 painter.drawPixmap(x - villager_width // 2, y, scaled_img)
                 
-                # Köylünün ismini ve mesleğini yaz
-                painter.setPen(Qt.black)
-                font = painter.font()
-                font.setPointSize(8)  # Yazı boyutunu küçült
-                font.setBold(True)
-                painter.setFont(font)
-                
-                # İsim ve meslek metni
-                text = f"{villager.name} ({villager.profession})"
-                
-                # Metni köylünün üzerine yaz
-                text_rect = painter.fontMetrics().boundingRect(text)
-                text_x = x - text_rect.width() // 2
-                text_y = y - 5  # Yazıyı biraz yukarı taşı
-                
-                # Metin arka planı
-                bg_rect = QRect(text_x - 2, text_y - text_rect.height(), text_rect.width() + 4, text_rect.height() + 2)
-                painter.fillRect(bg_rect, QColor(255, 255, 255, 180))
-                
-                # Metni çiz
-                painter.drawText(text_x, text_y, text)
-                
-                # Debug bilgisi - köylünün sınırlarını göster
-                painter.setPen(Qt.red)
-                painter.drawRect(x - villager_width // 2, y, villager_width, villager_height)
-                
-                # Debug bilgisi - köylünün koordinatlarını göster
-                debug_text = f"({int(villager.x)}, {int(y)})"
-                painter.drawText(x - 20, y + villager_height + 15, debug_text)
-                
         except Exception as e:
             print(f"HATA: Köylü çizme hatası: {e}")
             import traceback
             traceback.print_exc()
-    
+        
     def mousePressEvent(self, event):
         """Fare tıklama olayı"""
         try:

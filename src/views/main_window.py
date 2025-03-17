@@ -78,13 +78,14 @@ class MainWindow(QMainWindow):
         self.control_panel.minimize_game.connect(self.showMinimized)  # Küçült butonuna basınca pencereyi küçült
         
         # Gece/gündüz sinyalini kontrol paneline bağla
-        self.game_controller.day_night_changed.connect(self.control_panel.update_day_night)
+        self.game_controller.day_night_changed.connect(self.control_panel.update_day_night_style)
         
         # Köylü listesi sinyalini kontrol paneline bağla
         self.game_controller.villagers_updated.connect(self.control_panel.update_villagers)
         
         # İlk köylü listesini gönder
-        self.game_controller.villagers_updated.emit(self.game_controller.villagers)
+        if hasattr(self.game_controller, 'villagers'):
+            self.game_controller.villagers_updated.emit(self.game_controller.villagers)
         
         # Pencereyi tüm ekranları kapsayacak şekilde ayarla
         window_y = max_height - ground_height
