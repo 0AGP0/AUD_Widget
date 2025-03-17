@@ -5,6 +5,8 @@ from PyQt5.QtGui import QScreen, QColor
 from src.models.building import Building
 from src.models.villager import Villager, TestVillager
 from src.models.tree import Tree
+from src.models.building_site import BuildingSite
+from src.models.house import House
 import random
 import os
 import time
@@ -24,7 +26,7 @@ class GameController(QObject):
         
         # Gece/Gündüz sistemi için değişkenler
         self.is_daytime = True  # True = Gündüz, False = Gece
-        self.remaining_time = self.DAY_DURATION * 1000
+        self.remaining_time = self.DAY_DURATION * 1000  # Milisaniye cinsinden
         
         # Tüm ekranları al
         desktop = QDesktopWidget()
@@ -56,6 +58,8 @@ class GameController(QObject):
         self.buildings = []
         self.trees = []
         self.villagers = []
+        self.building_sites = []  # İnşaat alanları
+        self.houses = []  # Evler
         self.selected_villager = None
         
         # Döngüsel import sorununu çözmek için, GameWindow sınıfını import etmek yerine,
@@ -65,13 +69,8 @@ class GameController(QObject):
         # Kontrol paneli referansı
         self.control_panel = None
         
-        # Timer
-        print("Zamanlayıcılar oluşturuluyor...")
-        self.update_timer = QTimer()
-        self.update_timer.timeout.connect(self.toggle_day_night)
-        self.update_timer.start(self.DAY_DURATION * 1000)  # Milisaniye cinsinden
-        
-        # Kalan süre için timer
+        # Sadece bir zamanlayıcı kullan - kalan süreyi güncelle
+        print("Zamanlayıcı oluşturuluyor...")
         self.time_timer = QTimer()
         self.time_timer.timeout.connect(self.update_remaining_time)
         self.time_timer.start(1000)  # Her saniye güncelle
@@ -102,6 +101,10 @@ class GameController(QObject):
             self.castle = Building(x=400, y=self.ground_y, width=150, height=150, building_type="castle")
             print("Kale oluşturuldu")
             
+            # Kale envanterine başlangıç odun ekle
+            self.castle.add_to_inventory("odun", 100)
+            print("Kale envanterine 100 odun eklendi")
+            
             # Ağaçları oluştur
             print("Ağaçlar oluşturuluyor...")
             self.create_trees()
@@ -119,6 +122,10 @@ class GameController(QObject):
                 self.villagers_updated.emit(self.villagers)
             else:
                 print("Kontrol paneli bulunamadı!")
+            
+            # Ağaç sinyallerini bağla
+            for tree in self.trees:
+                tree.tree_removed.connect(self.on_tree_removed)
             
             # Oyun güncelleme zamanlayıcısını başlat
             print("Oyun güncelleme zamanlayıcısı başlatılıyor...")
@@ -230,8 +237,14 @@ class GameController(QObject):
         """İlk köylüleri oluştur"""
         try:
             print("Köylüler oluşturuluyor...")
-            professions = ["Oduncu", "Madenci", "İnşaatcı", "İşsiz", "Sanatçı"]
-            has_lumberjack = False
+            # Meslekleri güncelle
+            professions = ["Oduncu", "İnşaatçı", "Avcı", "Çiftçi", "Gardiyan", "Papaz"]
+            
+            # Zorunlu meslekleri takip etmek için
+            has_lumberjack = False  # Oduncu
+            has_builder = False     # İnşaatçı
+            has_guard = False       # Gardiyan
+            has_priest = False      # Papaz
             
             # Erkek ve kadın isimleri
             male_names = ["Ahmet", "Mehmet", "Ali", "Mustafa", "Hasan", "Hüseyin", "İbrahim", "Osman", "Yusuf", "Murat"]
@@ -240,8 +253,8 @@ class GameController(QObject):
             print(f"Erkek isimleri: {male_names}")
             print(f"Kadın isimleri: {female_names}")
             
-            # 4 köylü oluştur
-            for i in range(4):
+            # 6 köylü oluştur (4 yerine 6)
+            for i in range(6):
                 print(f"Köylü {i+1} oluşturuluyor...")
                 # Cinsiyet seçimi (en az 1 erkek ve 1 kadın olmalı)
                 if i == 0:
@@ -272,10 +285,14 @@ class GameController(QObject):
                 villager = Villager(
                     name=name,  # İsim ekledik
                     x=random.randint(100, 200),  # Kale civarında başla
-                    y=self.ground_height - 60,  # Zemin üzerinde
+                    y=self.ground_y,  # Zemin üzerinde, ağaçlarla aynı düzlemde
                     gender=gender,
                     appearance=appearance
                 )
+                
+                # Başlangıç parası (rastgele 5-20 altın)
+                villager.money = random.randint(5, 20)
+                print(f"Başlangıç parası: {villager.money} altın")
                 
                 print(f"Köylü nesnesi oluşturuldu: {villager}")
                 
@@ -303,18 +320,82 @@ class GameController(QObject):
                 villager.desired_traits = desired_traits
                 print(f"Eşinde aradığı: {villager.desired_traits}")
                 
-                # Son köylü ve hala oduncu yoksa, oduncu yap
-                if i == 3 and not has_lumberjack:
-                    profession = "Oduncu"
-                    has_lumberjack = True
-                else:
-                    # Meslek seçimi
-                    if not has_lumberjack and random.random() < 0.4:  # %40 şans
+                # Meslek atama stratejisi
+                # Son köylüye geldiğimizde eksik zorunlu meslekleri kontrol et
+                if i == 5:  # Son köylü
+                    if not has_lumberjack:
                         profession = "Oduncu"
                         has_lumberjack = True
+                    elif not has_builder:
+                        profession = "İnşaatçı"
+                        has_builder = True
+                    elif not has_guard:
+                        profession = "Gardiyan"
+                        has_guard = True
+                    elif not has_priest:
+                        profession = "Papaz"
+                        has_priest = True
                     else:
-                        available_professions = [p for p in professions if p != "Oduncu"]
+                        # Tüm zorunlu meslekler atanmışsa, kalan mesleklerden birini seç
+                        available_professions = [p for p in professions if p not in ["Oduncu", "İnşaatçı", "Gardiyan", "Papaz"] or 
+                                                (p == "Papaz" and not has_priest)]
                         profession = random.choice(available_professions)
+                elif i == 4:  # 5. köylü
+                    # Eksik zorunlu meslekleri kontrol et
+                    missing_required = []
+                    if not has_lumberjack:
+                        missing_required.append("Oduncu")
+                    if not has_builder:
+                        missing_required.append("İnşaatçı")
+                    if not has_guard:
+                        missing_required.append("Gardiyan")
+                    if not has_priest:
+                        missing_required.append("Papaz")
+                    
+                    if missing_required:
+                        profession = random.choice(missing_required)
+                        if profession == "Oduncu":
+                            has_lumberjack = True
+                        elif profession == "İnşaatçı":
+                            has_builder = True
+                        elif profession == "Gardiyan":
+                            has_guard = True
+                        elif profession == "Papaz":
+                            has_priest = True
+                    else:
+                        # Tüm zorunlu meslekler atanmışsa, kalan mesleklerden birini seç
+                        available_professions = [p for p in professions if p not in ["Papaz"] or 
+                                                (p == "Papaz" and not has_priest)]
+                        profession = random.choice(available_professions)
+                        if profession == "Papaz":
+                            has_priest = True
+                else:
+                    # İlk 4 köylü için rastgele meslek ata, ancak Papaz'ı sadece bir kişiye ata
+                    if not has_priest and random.random() < 0.2:  # %20 şans
+                        profession = "Papaz"
+                        has_priest = True
+                    elif not has_lumberjack and random.random() < 0.3:  # %30 şans
+                        profession = "Oduncu"
+                        has_lumberjack = True
+                    elif not has_builder and random.random() < 0.3:  # %30 şans
+                        profession = "İnşaatçı"
+                        has_builder = True
+                    elif not has_guard and random.random() < 0.3:  # %30 şans
+                        profession = "Gardiyan"
+                        has_guard = True
+                    else:
+                        # Papaz hariç diğer mesleklerden birini seç
+                        available_professions = [p for p in professions if p != "Papaz" or 
+                                                (p == "Papaz" and not has_priest)]
+                        profession = random.choice(available_professions)
+                        if profession == "Oduncu":
+                            has_lumberjack = True
+                        elif profession == "İnşaatçı":
+                            has_builder = True
+                        elif profession == "Gardiyan":
+                            has_guard = True
+                        elif profession == "Papaz":
+                            has_priest = True
                 
                 print(f"Meslek: {profession}")
                 villager.set_profession(profession)
@@ -323,14 +404,17 @@ class GameController(QObject):
                 print(f"Köylü oluşturuldu: {villager.name} ({villager.gender}) - {profession}")
                 print(f"  Özellikler: {', '.join(villager.traits)}")
                 print(f"  Eşinde aradığı: {', '.join(villager.desired_traits)}")
+                print(f"  Para: {villager.money} altın")
             
             # Köylü listesini güncelle
             print(f"Köylü listesi güncelleniyor: {len(self.villagers)} köylü")
             self.villagers_updated.emit(self.villagers)
             
             print(f"Toplam köylü sayısı: {len(self.villagers)}")
-            if has_lumberjack:
-                print("En az bir oduncu başarıyla oluşturuldu!")
+            print(f"Oduncu: {'Var' if has_lumberjack else 'Yok'}")
+            print(f"İnşaatçı: {'Var' if has_builder else 'Yok'}")
+            print(f"Gardiyan: {'Var' if has_guard else 'Yok'}")
+            print(f"Papaz: {'Var' if has_priest else 'Yok'}")
             
         except Exception as e:
             print(f"HATA: Köylü oluşturma genel hatası: {e}")
@@ -439,44 +523,10 @@ class GameController(QObject):
             self.is_daytime = True
             self.remaining_time = self.DAY_DURATION * 1000
             
-            # Timer'ı başlat
-            self.update_timer = QTimer()
-            self.update_timer.timeout.connect(self.toggle_day_night)
-            self.update_timer.start(self.DAY_DURATION * 1000)  # Milisaniye cinsinden
-            
             print("Gündüz/gece döngüsü başlatıldı")
             
         except Exception as e:
             print(f"HATA: Gündüz/gece döngüsü başlatılamadı: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def toggle_day_night(self):
-        """Gündüz/gece döngüsünü değiştir"""
-        try:
-            self.is_daytime = not self.is_daytime
-            
-            # Sinyal gönder
-            self.day_night_changed.emit(self.is_daytime)
-            
-            # Timer'ı yeni süreye ayarla
-            new_duration = self.DAY_DURATION if self.is_daytime else self.NIGHT_DURATION
-            self.update_timer.setInterval(new_duration * 1000)
-            
-            # Gündüz başladıysa oduncuların kesme sayılarını sıfırla
-            if self.is_daytime:
-                for villager in self.villagers:
-                    if villager.profession == "Oduncu":
-                        villager.trees_cut_today = 0
-                        print(f"{villager.name} yeni güne başladı, kesme hakkı: {villager.max_trees_per_day}")
-                self.start_villagers_wandering()
-            else:
-                self.return_villagers_to_castle()
-            
-            print(f"Gündüz/gece değişti: {'Gündüz' if self.is_daytime else 'Gece'}")
-            
-        except Exception as e:
-            print(f"HATA: Gündüz/gece değiştirme hatası: {e}")
             import traceback
             traceback.print_exc()
     
@@ -506,30 +556,6 @@ class GameController(QObject):
             import traceback
             traceback.print_exc()
     
-    def start_villagers_wandering(self):
-        """Köylüleri tekrar dolaşmaya başlat"""
-        try:
-            for villager in self.villagers:
-                # Köylünün hedefini rastgele bir noktaya ayarla
-                villager.target_x = random.randint(100, 800)  # Kale etrafında rastgele bir nokta
-                villager.target_y = self.ground_y - 100
-                villager.is_moving = True
-                villager.is_wandering = True  # Dolaşmayı başlat
-                
-                # Eğer oduncu ise kesme sayısını sıfırla
-                if villager.profession == "Oduncu":
-                    villager.trees_cut_today = 0
-                    print(f"{villager.name} yeni güne başladı, kesme hakkı: {villager.max_trees_per_day}")
-                
-                print(f"{villager.name} dolaşmaya başlıyor")
-            
-            print("Tüm köylüler dolaşmaya başladı")
-            
-        except Exception as e:
-            print(f"HATA: Köylüler dolaşmaya başlatılamadı: {e}")
-            import traceback
-            traceback.print_exc()
-    
     def get_remaining_time(self) -> tuple[int, int]:
         """Kalan süreyi dakika ve saniye olarak döndür"""
         minutes = self.remaining_time // 60000  # milisaniyeyi dakikaya çevir
@@ -538,13 +564,51 @@ class GameController(QObject):
     
     def update_remaining_time(self):
         """Kalan süreyi güncelle"""
-        self.remaining_time -= 1000
-        if self.remaining_time <= 0:
-            self.toggle_day_night()
+        try:
+            # Kalan süreyi azalt
+            self.remaining_time -= 1000  # Her saniye 1000 milisaniye azalt
+            
+            # Kalan süre bittiyse gece-gündüz değişimi yap
+            if self.remaining_time <= 0:
+                # Gündüz/gece durumunu değiştir
+                self.is_daytime = not self.is_daytime
+                
+                # Yeni süreyi ayarla
+                if self.is_daytime:
+                    self.remaining_time = self.DAY_DURATION * 1000  # Gündüz süresi
+                    print(f"Gündüz başladı. Süre: {self.DAY_DURATION} saniye")
+                    
+                    # Gündüz başladığında köylüleri dolaşmaya başlat
+                    for villager in self.villagers:
+                        if villager.profession == "Oduncu":
+                            villager.trees_cut_today = 0
+                            print(f"{villager.name} yeni güne başladı, kesme hakkı: {villager.max_trees_per_day}")
+                    self.start_villagers_wandering()
+                else:
+                    self.remaining_time = self.NIGHT_DURATION * 1000  # Gece süresi
+                    print(f"Gece başladı. Süre: {self.NIGHT_DURATION} saniye")
+                    
+                    # Gece başladığında köylüleri kaleye döndür
+                    self.return_villagers_to_castle()
+                
+                # Sinyal gönder
+                self.day_night_changed.emit(self.is_daytime)
+                print(f"Gündüz/gece değişti: {'Gündüz' if self.is_daytime else 'Gece'}")
+            
+            # Kontrol panelini güncelle
+            if hasattr(self, 'control_panel') and self.control_panel:
+                self.control_panel.update_time_label()
+                
+        except Exception as e:
+            print(f"HATA: Kalan süre güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc()
     
     def on_tree_removed(self, tree):
         """Ağaç kesildiğinde çağrılır"""
         try:
+            print(f"Ağaç kaldırıldı: {tree.id}")
+            
             # Ağacı ID'sine göre listeden kaldır
             tree_id = tree.id
             removed = False
@@ -563,8 +627,12 @@ class GameController(QObject):
             QTimer.singleShot(10000, self.add_new_tree)
             print(f"Yeni ağaç 10 saniye sonra eklenecek")
             
+            # Kale envanterini güncelle
+            if hasattr(self, 'control_panel'):
+                self.control_panel.update_castle_inventory()
+                
         except Exception as e:
-            print(f"HATA: Ağaç kaldırma hatası: {e}")
+            print(f"HATA: Ağaç kaldırma işlemi sırasında hata: {e}")
             import traceback
             traceback.print_exc()
     
@@ -636,5 +704,136 @@ class GameController(QObject):
             print("Kontrol paneli başarıyla ayarlandı")
         except Exception as e:
             print(f"HATA: Kontrol paneli ayarlanırken hata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def create_building_site(self, x: float, y: float) -> BuildingSite:
+        """İnşaat alanı oluştur"""
+        try:
+            # İnşaat alanı boyutları
+            width = 100
+            height = 80
+            
+            # İnşaat alanını oluştur
+            building_site = BuildingSite(x=x, y=y, width=width, height=height)
+            
+            # Sinyalleri bağla
+            building_site.construction_finished.connect(self.on_construction_finished)
+            
+            # Listeye ekle
+            self.building_sites.append(building_site)
+            
+            print(f"İnşaat alanı oluşturuldu: ({x}, {y})")
+            return building_site
+            
+        except Exception as e:
+            print(f"HATA: İnşaat alanı oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def on_construction_finished(self, building_site: BuildingSite):
+        """İnşaat tamamlandığında çağrılır"""
+        try:
+            print(f"İnşaat tamamlandı: {building_site.id}")
+            
+            # Ev oluştur
+            house = House(
+                x=building_site.x,
+                y=building_site.y,
+                width=building_site.width,
+                height=building_site.height,
+                house_type=building_site.house_type
+            )
+            
+            # Listeye ekle
+            self.houses.append(house)
+            
+            # İnşaat alanını listeden kaldır
+            for i, site in enumerate(self.building_sites[:]):
+                if site.id == building_site.id:
+                    self.building_sites.pop(i)
+                    print(f"İnşaat alanı ID: {building_site.id} listeden kaldırıldı")
+                    break
+            
+            # Ev satın alma işlemini başlat
+            self.try_sell_house(house)
+            
+            print(f"Ev oluşturuldu: {house.id}")
+            
+        except Exception as e:
+            print(f"HATA: İnşaat tamamlama hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def try_sell_house(self, house: House):
+        """Evi satmayı dene"""
+        try:
+            # Ev zaten satılmışsa işlem yapma
+            if house.is_owned():
+                print(f"Ev ID: {house.id} zaten satılmış! Sahibi: {house.owner}")
+                return
+                
+            # Satın alabilecek köylüleri bul (5 altın veya daha fazlası olanlar)
+            potential_buyers = [v for v in self.villagers if v.money >= 5 and not v.has_house]
+            
+            if not potential_buyers:
+                print(f"Ev ID: {house.id} için alıcı bulunamadı!")
+                return
+                
+            # Rastgele bir alıcı seç
+            buyer = random.choice(potential_buyers)
+            
+            # Evi sat
+            house_price = 5  # Ev fiyatını düşürdük (10'dan 5'e)
+            buyer.money -= house_price
+            house.set_owner(buyer.name)
+            
+            # Köylünün ev sahibi olduğunu işaretle
+            buyer.has_house = True
+            buyer.house_id = house.id
+            
+            print(f"Ev ID: {house.id} satıldı! Alıcı: {buyer.name}, Ödenen: {house_price} altın, Kalan para: {buyer.money} altın")
+            
+        except Exception as e:
+            print(f"HATA: Ev satma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def find_house_by_id(self, house_id) -> Optional[House]:
+        """ID'ye göre ev bul"""
+        for house in self.houses:
+            if house.id == house_id:
+                return house
+        return None
+    
+    def find_house_by_owner(self, owner_name: str) -> Optional[House]:
+        """Sahibine göre ev bul"""
+        for house in self.houses:
+            if house.owner == owner_name:
+                return house
+        return None
+    
+    def start_villagers_wandering(self):
+        """Köylüleri tekrar dolaşmaya başlat"""
+        try:
+            for villager in self.villagers:
+                # Köylünün hedefini rastgele bir noktaya ayarla
+                villager.target_x = random.randint(100, 800)  # Kale etrafında rastgele bir nokta
+                villager.target_y = self.ground_y - 100
+                villager.is_moving = True
+                villager.is_wandering = True  # Dolaşmayı başlat
+                
+                # Eğer oduncu ise kesme sayısını sıfırla
+                if villager.profession == "Oduncu":
+                    villager.trees_cut_today = 0
+                    print(f"{villager.name} yeni güne başladı, kesme hakkı: {villager.max_trees_per_day}")
+                
+                print(f"{villager.name} dolaşmaya başlıyor")
+            
+            print("Tüm köylüler dolaşmaya başladı")
+            
+        except Exception as e:
+            print(f"HATA: Köylüler dolaşmaya başlatılamadı: {e}")
             import traceback
             traceback.print_exc() 

@@ -14,11 +14,15 @@ class Villager:
     appearance: int = 0
     x: float = 0.0
     y: float = 0.0
+    width: int = 40  # Köylü genişliği
+    height: int = 40  # Köylü yüksekliği
     direction: int = 1  # 1 = sağa, -1 = sola
+    direction_x: int = 1  # 1 = sağa, -1 = sola (çizim için)
     health: int = 100
     money: int = 0
     happiness: int = 100
     is_daytime: bool = True  # Gündüz/gece durumu
+    state: str = "Dolaşıyor"  # Köylünün durumu
     
     # Köylü özellikleri
     charisma: int = 50
@@ -28,6 +32,10 @@ class Villager:
     # Karakteristik özellikler
     traits: list = None  # Köylünün karakteristik özellikleri
     desired_traits: list = None  # Eşinde aradığı özellikler
+    
+    # Ev sahibi olma durumu
+    has_house: bool = False
+    house_id: int = None
     
     # Hareket özellikleri
     speed: float = 1.0  # Hızı 5.0'dan 1.0'a düşürdük
@@ -67,6 +75,43 @@ class Villager:
     is_cutting: bool = False
     last_cut_time: float = 0.0
     
+    # İnşaatçı özellikleri
+    buildings_built: int = 0
+    max_buildings_per_day: int = 1
+    building_skill: int = 1
+    target_building_site: Optional['BuildingSite'] = None
+    is_building: bool = False
+    building_progress: float = 0.0
+    
+    # Avcı özellikleri
+    animals_hunted: int = 0
+    max_hunts_per_day: int = 3
+    hunting_skill: int = 1
+    is_hunting: bool = False
+    hunting_progress: float = 0.0
+    
+    # Çiftçi özellikleri
+    crops_harvested: int = 0
+    max_harvests_per_day: int = 2
+    farming_skill: int = 1
+    target_field: Optional['Field'] = None
+    is_farming: bool = False
+    farming_progress: float = 0.0
+    
+    # Gardiyan özellikleri
+    patrol_count: int = 0
+    max_patrols_per_day: int = 4
+    guard_skill: int = 1
+    is_patrolling: bool = False
+    target_villager: Optional['Villager'] = None
+    
+    # Papaz özellikleri
+    ceremonies_performed: int = 0
+    max_ceremonies_per_day: int = 2
+    faith_skill: int = 1
+    is_praying: bool = False
+    target_ceremony: str = ""
+    
     # Hareket değişkenleri
     max_speed: float = 1.5  # Maksimum hız
     acceleration: float = 0.1  # Hızlanma
@@ -89,6 +134,9 @@ class Villager:
             self.traits = []
         if self.desired_traits is None:
             self.desired_traits = []
+        
+        # Temel Y pozisyonunu ayarla
+        self.base_y = self.y
     
     def __hash__(self):
         """Hash değerini döndür"""
@@ -112,6 +160,43 @@ class Villager:
             self.is_cutting = False  # Şu an ağaç kesiyor mu?
             self.target_tree = None  # Hedef ağaç
             self.last_cut_time = 0  # Son kesme zamanı
+        
+        # İnşaatçı için özel ayarlar
+        elif profession == "İnşaatçı":
+            self.buildings_built = 0  # Bugün inşa edilen bina sayısı
+            self.max_buildings_per_day = 1  # Günlük inşa edebileceği maksimum bina
+            self.is_building = False  # Şu an inşaat yapıyor mu?
+            self.target_building_site = None  # Hedef inşaat alanı
+            self.building_progress = 0.0  # İnşaat ilerleme durumu
+        
+        # Avcı için özel ayarlar
+        elif profession == "Avcı":
+            self.animals_hunted = 0  # Bugün avlanan hayvan sayısı
+            self.max_hunts_per_day = 3  # Günlük avlanabileceği maksimum hayvan
+            self.is_hunting = False  # Şu an avlanıyor mu?
+            self.hunting_progress = 0.0  # Avlanma ilerleme durumu
+        
+        # Çiftçi için özel ayarlar
+        elif profession == "Çiftçi":
+            self.crops_harvested = 0  # Bugün hasat edilen ürün sayısı
+            self.max_harvests_per_day = 2  # Günlük hasat edebileceği maksimum ürün
+            self.is_farming = False  # Şu an çiftçilik yapıyor mu?
+            self.target_field = None  # Hedef tarla
+            self.farming_progress = 0.0  # Çiftçilik ilerleme durumu
+        
+        # Gardiyan için özel ayarlar
+        elif profession == "Gardiyan":
+            self.patrol_count = 0  # Bugün yapılan devriye sayısı
+            self.max_patrols_per_day = 4  # Günlük yapabileceği maksimum devriye
+            self.is_patrolling = False  # Şu an devriye geziyor mu?
+            self.target_villager = None  # Hedef köylü (sorun çıkaran)
+        
+        # Papaz için özel ayarlar
+        elif profession == "Papaz":
+            self.ceremonies_performed = 0  # Bugün gerçekleştirilen tören sayısı
+            self.max_ceremonies_per_day = 2  # Günlük gerçekleştirebileceği maksimum tören
+            self.is_praying = False  # Şu an dua ediyor mu?
+            self.target_ceremony = ""  # Hedef tören (evlilik, cenaze vb.)
     
     def update_stats(self) -> None:
         """Özellikleri güncelle"""
@@ -127,7 +212,7 @@ class Villager:
             self.animation_time += 0.016  # Yaklaşık 60 FPS
             
             # Eğilme animasyonunu güncelle
-            if self.is_moving or self.is_cutting:
+            if self.is_moving or self.is_cutting or self.is_building:
                 time_diff = current_time - self.last_rotation_time
                 
                 # Her rotation_interval sürede bir yön değiştir
@@ -152,7 +237,7 @@ class Villager:
             
             # Animasyon hızına göre kare değişimi
             if current_time - self.last_frame_time >= self.animation_speed:
-                if self.is_moving or self.is_cutting:
+                if self.is_moving or self.is_cutting or self.is_building:
                     self.current_frame = (self.current_frame + 1) % self.frame_count
                 else:
                     self.current_frame = 0
@@ -160,24 +245,170 @@ class Villager:
                 
         except Exception as e:
             print(f"HATA: {self.name} animasyon güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc()
         
     def move(self):
         """Köylüyü hareket ettir"""
         try:
-            # Oduncu ise ve gündüz ise
-            if self.profession == "Oduncu" and hasattr(self, 'game_controller'):
-                if self.game_controller.is_daytime:
-                    if self.trees_cut_today < self.max_trees_per_day:
-                        self.handle_woodcutter()
-                    else:
-                        self.wander()  # Limit dolmuşsa dolaş
+            # Gece kontrolü - gece olunca herkes eve döner
+            if hasattr(self, 'game_controller') and not self.game_controller.is_daytime:
+                self.go_home()
+                return
+                
+            # Gündüz - mesleğe göre davranış
+            if self.profession == "Oduncu":
+                if self.trees_cut_today < self.max_trees_per_day:
+                    self.handle_woodcutter()
+                    self.state = "Ağaç Arıyor" if not self.is_cutting else "Ağaç Kesiyor"
                 else:
-                    self.go_home()  # Gece olunca eve dön
+                    self.wander()  # Limit dolmuşsa dolaş
+                    self.state = "Dolaşıyor (Limit)"
+            elif self.profession == "İnşaatçı":
+                if self.buildings_built < self.max_buildings_per_day:
+                    self.handle_builder()
+                    self.state = "İnşaat Arıyor" if not self.is_building else "İnşaat Yapıyor"
+                else:
+                    self.wander()
+                    self.state = "Dolaşıyor (Limit)"
+            elif self.profession == "Avcı":
+                if self.animals_hunted < self.max_hunts_per_day:
+                    self.handle_hunter()
+                    self.state = "Avlanıyor"
+                else:
+                    self.wander()
+                    self.state = "Dolaşıyor (Limit)"
+            elif self.profession == "Çiftçi":
+                if self.crops_harvested < self.max_harvests_per_day:
+                    self.handle_farmer()
+                    self.state = "Çiftçilik Yapıyor"
+                else:
+                    self.wander()
+                    self.state = "Dolaşıyor (Limit)"
+            elif self.profession == "Gardiyan":
+                if self.patrol_count < self.max_patrols_per_day:
+                    self.handle_guard()
+                    self.state = "Devriye Geziyor"
+                else:
+                    self.wander()
+                    self.state = "Dolaşıyor (Limit)"
+            elif self.profession == "Papaz":
+                if self.ceremonies_performed < self.max_ceremonies_per_day:
+                    self.handle_priest()
+                    self.state = "Dua Ediyor"
+                else:
+                    self.wander()
+                    self.state = "Dolaşıyor (Limit)"
             else:
                 self.wander()  # Diğer meslekler dolaşır
+                self.state = "Dolaşıyor"
+                
+            # Animasyonu güncelle
+            self.update_animation()
                 
         except Exception as e:
             print(f"HATA: {self.name} hareket hatası: {e}")
+            
+    def handle_builder(self):
+        """İnşaatçı mantığı"""
+        try:
+            # Eğer inşaat yapıyorsa
+            if self.is_building and self.target_building_site:
+                # İnşaat alanı görünür değilse veya listeden kaldırılmışsa
+                if not hasattr(self.target_building_site, 'is_active') or not self.target_building_site.is_active:
+                    self.is_building = False
+                    print(f"{self.name} inşaat ID: {self.target_building_site.id} tamamlandı, yeni inşaat alanı arıyor.")
+                    self.target_building_site = None
+                    # İnşaat tamamlandıktan sonra kısa bir süre bekle, sonra yeni inşaat alanı ara
+                    QTimer.singleShot(2000, self.find_building_site)
+                    # Bu arada biraz dolaş
+                    self.wander()
+                return
+                
+            # Yeni inşaat alanı ara
+            self.find_building_site()
+            
+        except Exception as e:
+            print(f"HATA: {self.name} inşaatçı mantığı hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def find_building_site(self):
+        """İnşaat alanı bul veya oluştur"""
+        try:
+            if not hasattr(self, 'game_controller') or not self.game_controller:
+                return
+                
+            # Eğer zaten inşaat yapıyorsa yeni inşaat alanı arama
+            if self.is_building and self.target_building_site:
+                return
+                
+            # Mevcut inşaat alanlarını kontrol et
+            for site in self.game_controller.building_sites:
+                if hasattr(site, 'is_active') and site.is_active and not site.builder:
+                    # İnşaat alanına git
+                    distance = abs(site.x - self.x)
+                    if distance < 30:  # İnşaat mesafesindeyse
+                        # İnşaata başla
+                        if site.start_construction(self):
+                            self.target_building_site = site
+                            self.is_building = True
+                            self.is_moving = False
+                            print(f"{self.name} inşaata başladı. İnşaat ID: {site.id}")
+                            return
+                    else:  # İnşaat alanına doğru git
+                        self.move_towards(site.x)
+                        print(f"{self.name} inşaat alanına doğru ilerliyor. Mesafe: {distance:.1f}")
+                        return
+            
+            # Mevcut inşaat alanı yoksa ve kale envanterinde yeterli odun varsa yeni inşaat alanı oluştur
+            if hasattr(self.game_controller, 'castle') and self.game_controller.castle:
+                castle = self.game_controller.castle
+                if castle.get_inventory().get('odun', 0) >= 20:
+                    # Rastgele bir konum seç (kale civarında)
+                    castle_x = self.game_controller.castle.x
+                    min_x = castle_x + 200  # Kaleden en az 200 piksel uzakta
+                    max_x = castle_x + 1000  # Kaleden en fazla 1000 piksel uzakta
+                    x = random.uniform(min_x, max_x)
+                    y = self.game_controller.ground_y
+                    
+                    # İnşaat alanı oluşturma şansı
+                    if random.random() < 0.3:  # %30 şans (daha önce daha düşüktü)
+                        # İnşaat alanı oluştur
+                        building_site = self.game_controller.create_building_site(x, y)
+                        if building_site:
+                            # İnşaat alanına git
+                            self.move_towards(building_site.x)
+                            print(f"{self.name} yeni inşaat alanına doğru ilerliyor. Mesafe: {abs(building_site.x - self.x):.1f}")
+                            return
+            
+            # İnşaat alanı bulunamadı veya oluşturulamadı, dolaş
+            self.wander()
+            
+        except Exception as e:
+            print(f"HATA: {self.name} inşaat alanı bulma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def handle_hunter(self):
+        """Avcı mantığı"""
+        # Şimdilik sadece dolaş
+        self.wander()
+        
+    def handle_farmer(self):
+        """Çiftçi mantığı"""
+        # Şimdilik sadece dolaş
+        self.wander()
+        
+    def handle_guard(self):
+        """Gardiyan mantığı"""
+        # Şimdilik sadece dolaş
+        self.wander()
+        
+    def handle_priest(self):
+        """Papaz mantığı"""
+        # Şimdilik sadece dolaş
+        self.wander()
     
     def handle_woodcutter(self):
         """Oduncu mantığı"""
@@ -244,9 +475,11 @@ class Villager:
         
         if target_x > self.x:
             self.direction = 1
+            self.direction_x = 1  # Sağa doğru
             self.x += self.speed
         else:
             self.direction = -1
+            self.direction_x = -1  # Sola doğru
             self.x -= self.speed
     
     def wander(self):
@@ -257,19 +490,52 @@ class Villager:
             new_x = max(100, min(1820, new_x))  # Ekran sınırları
             self.target_x = new_x
             self.is_moving = True
+            self.state = "Dolaşıyor"
         
         # Hedefe doğru hareket et
         self.move_towards(self.target_x)
     
     def go_home(self):
-        """Eve dön"""
-        if self.is_cutting:
-            if self.target_tree:
-                self.target_tree.stop_cutting()
-            self.is_cutting = False
-            self.target_tree = None
-        
-        self.move_towards(100)  # Kale x koordinatı
+        """Eve veya kaleye dön"""
+        try:
+            # Ev sahibiyse evine dön
+            if self.has_house and hasattr(self, 'game_controller') and self.game_controller:
+                house = self.game_controller.find_house_by_id(self.house_id)
+                if house:
+                    target_x = house.get_entrance()[0]
+                    # Eğer eve yakınsa durma
+                    if abs(self.x - target_x) < 20:
+                        self.is_moving = False
+                        self.state = "Evde"
+                        return
+                    # Eve doğru hareket et
+                    self.move_towards(target_x)
+                    self.state = "Eve Dönüyor"
+                    return
+            
+            # Ev sahibi değilse veya ev bulunamadıysa kaleye dön
+            if hasattr(self, 'game_controller') and self.game_controller and hasattr(self.game_controller, 'castle'):
+                castle = self.game_controller.castle
+                if castle:
+                    target_x = castle.get_entrance()[0]
+                    # Eğer kaleye yakınsa durma
+                    if abs(self.x - target_x) < 20:
+                        self.is_moving = False
+                        self.state = "Kalede"
+                        return
+                    # Kaleye doğru hareket et
+                    self.move_towards(target_x)
+                    self.state = "Kaleye Dönüyor"
+                    return
+            
+            # Kale de bulunamadıysa dolaş
+            self.wander()
+            self.state = "Dolaşıyor"
+            
+        except Exception as e:
+            print(f"HATA: {self.name} eve dönme hatası: {e}")
+            import traceback
+            traceback.print_exc()
     
     def set_game_controller(self, game_controller):
         """Oyun kontrolcüsünü ayarla"""

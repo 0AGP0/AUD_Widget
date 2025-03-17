@@ -70,6 +70,18 @@ class Tree(QObject):
             self.current_woodcutter.trees_cut_today += 1
             # Oduncuya 10 altın ekle
             self.current_woodcutter.money += 10
+            
+            # Kale envanterine 10 odun ekle
+            if hasattr(self.current_woodcutter, 'game_controller') and self.current_woodcutter.game_controller:
+                game_controller = self.current_woodcutter.game_controller
+                if hasattr(game_controller, 'castle') and game_controller.castle:
+                    game_controller.castle.add_to_inventory("odun", 10)
+                    print(f"Kale envanterine 10 odun eklendi!")
+                else:
+                    print("UYARI: Kale bulunamadı, odun eklenemedi!")
+            else:
+                print("UYARI: Oyun kontrolcüsü bulunamadı, odun eklenemedi!")
+            
             self.woodcutter_finished.emit(self)
             print(f"Ağaç ID: {self.id} kesildi! Oduncu {self.current_woodcutter.name} bugün {self.current_woodcutter.trees_cut_today} ağaç kesti ve 10 altın kazandı. Toplam altın: {self.current_woodcutter.money}")
         

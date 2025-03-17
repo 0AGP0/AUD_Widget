@@ -64,7 +64,7 @@ B. Köylü Karakterlerinin Oluşturulması
 [B.1] Başlangıç Karakterleri Üretimi:
 
 Adım 1: 6 köylü için rastgele cinsiyet ve isim belirle.
-Adım 2: Her köylüye meslek ataması yap (Oduncu, İnşaatçı, Avcı, Çiftci, Gardiyan, Papaz).
+Adım 2: Her köylüye meslek ataması yap (en az 1 Oduncu, en az 1 İnşaatçı, Avcı, Çiftci, en az 1 Gardiyan, 1 tane Papaz).
 Adım 3: Her köylüye 4 adet, 28 özellik havuzundan rastgele seçilmiş karakteristik özellik ataması yap.
 Adım 4: Her köylü için “eşinde aradığı özellikler” listesinden 2 özellik rastgele belirle.
 
@@ -85,9 +85,17 @@ Algoritma:
 
 [C.2] İnşaatçı Mekaniği:
 
--Gelen odun miktarına göre ev inşası başlatılır.
+-Oduncudan gelen odun miktarına göre ev inşası başlatılır.
+-ev inşaa etmek için 20 oduna ihtiyaç var
+-bir ağaç kesildiğine 10 odun eklenir envantere(Bu envanter kalede bulunur. panele birde kale kısmı ekleyip kale içinde ne kadar envanter bulunuduğu gösterilir. Odun, Erzak vb.)
+-Yeterli odun olunca inşaatcı ev yapmaya başlar. ev yapımı 10 sn sürer
 -İnşaat sürecinde animasyon ve ilerleme göstergesi uygulanır.
 -Ev tamamlandığında, köylü ve ilgili paneller güncellenir.
+-Yapılan evin bir sahibi olmaz ilk başta. Evi satın alabilecek kadar parası olan bir köylü varsa o evi satın alır. Şimdilik 10 altın evin fiyatı normalde 100 yapıcaz.
+-evi satın alan köylü geceleri kaleye dönmek yerine evine döner.
+-İnşaatcı ev inşaa edince 100 altın kazanıyor.
+-Eğer evi satın alabilecek kadar parası olan 1 den fazla köylü varsa aralarından rastgele biri satın alır.
+-evler için assetlerdeki ev pnglerini kullan arakarından rastgele birini yapsın inşaatcı
 
 [C.3] Avcı ve Çiftçi Mekanikleri:
 

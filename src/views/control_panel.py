@@ -169,6 +169,15 @@ class VillagerDetailsPanel(QFrame):
         self.traits_text.setWordWrap(True)
         layout.addWidget(self.traits_text)
         
+        # Eşinde aradığı özellikler
+        self.desired_traits_label = QLabel("Eşinde Aradığı Özellikler:")
+        self.desired_traits_label.setFont(QFont("Arial", 10, QFont.Bold))
+        layout.addWidget(self.desired_traits_label)
+        
+        self.desired_traits_text = QLabel("-")
+        self.desired_traits_text.setWordWrap(True)
+        layout.addWidget(self.desired_traits_text)
+        
         layout.addStretch()
         
         # Stil
@@ -206,6 +215,11 @@ class VillagerDetailsPanel(QFrame):
         if hasattr(villager, 'traits'):
             traits_text = ", ".join(villager.traits) if villager.traits else "Yok"
             self.traits_text.setText(traits_text)
+            
+        # Eşinde aradığı özellikleri güncelle
+        if hasattr(villager, 'desired_traits'):
+            desired_traits_text = ", ".join(villager.desired_traits) if villager.desired_traits else "Yok"
+            self.desired_traits_text.setText(desired_traits_text)
 
 class ControlPanel(QWidget):
     """Kontrol paneli"""
@@ -230,6 +244,10 @@ class ControlPanel(QWidget):
             # Oyun kontrolcüsünü ayarladıktan sonra, kontrolcüye de kontrol panelini ayarla
             if hasattr(game_controller, 'set_control_panel'):
                 game_controller.set_control_panel(self)
+            
+            # Kale envanterini güncelle
+            self.update_castle_inventory()
+            
             print("Oyun kontrolcüsü başarıyla ayarlandı")
         except Exception as e:
             print(f"HATA: Oyun kontrolcüsü ayarlanırken hata: {e}")
@@ -314,6 +332,60 @@ class ControlPanel(QWidget):
             separator.setFrameShape(QFrame.HLine)
             separator.setStyleSheet("background-color: #2D2D2D;")
             left_layout.addWidget(separator)
+            
+            # Kale Envanteri Bölümü
+            castle_inventory_widget = QWidget()
+            castle_inventory_widget.setObjectName("castleInventory")
+            castle_inventory_layout = QVBoxLayout(castle_inventory_widget)
+            castle_inventory_layout.setContentsMargins(10, 10, 10, 10)
+            castle_inventory_layout.setSpacing(5)
+            
+            # Kale Envanteri Başlığı
+            castle_inventory_title = QLabel("Kale Envanteri")
+            castle_inventory_title.setStyleSheet("""
+                QLabel {
+                    color: #E4E4E4;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+            """)
+            castle_inventory_layout.addWidget(castle_inventory_title)
+            
+            # Envanter öğeleri
+            self.inventory_labels = {}
+            for item_name, icon_color in [
+                ("odun", "#8B4513"),  # Kahverengi
+                ("erzak", "#27ae60"),  # Yeşil
+                ("altın", "#f1c40f")   # Sarı
+            ]:
+                item_layout = QHBoxLayout()
+                
+                # Renkli ikon
+                icon = QLabel("■")
+                icon.setStyleSheet(f"color: {icon_color}; font-size: 14px;")
+                item_layout.addWidget(icon)
+                
+                # Öğe adı
+                item_label = QLabel(item_name.capitalize())
+                item_label.setStyleSheet("color: #E4E4E4; font-size: 12px;")
+                item_layout.addWidget(item_label)
+                
+                # Miktar
+                amount_label = QLabel("0")
+                amount_label.setStyleSheet("color: #E4E4E4; font-size: 12px; font-weight: bold;")
+                amount_label.setAlignment(Qt.AlignRight)
+                item_layout.addWidget(amount_label)
+                
+                castle_inventory_layout.addLayout(item_layout)
+                self.inventory_labels[item_name] = amount_label
+            
+            left_layout.addWidget(castle_inventory_widget)
+            
+            # Ayırıcı çizgi
+            separator2 = QFrame()
+            separator2.setFrameShape(QFrame.HLine)
+            separator2.setStyleSheet("background-color: #2D2D2D;")
+            left_layout.addWidget(separator2)
             
             # Scroll area
             scroll_area = QScrollArea()
@@ -413,6 +485,12 @@ class ControlPanel(QWidget):
                     border-radius: 10px;
                     border: 1px solid #2D2D2D;
                 }
+                #castleInventory {
+                    background-color: #0A1F0A;
+                    border-radius: 8px;
+                    border: 1px solid #132813;
+                    margin: 5px;
+                }
                 QMessageBox {
                     background-color: #1E1E1E;
                 }
@@ -437,6 +515,30 @@ class ControlPanel(QWidget):
             
         except Exception as e:
             print(f"HATA: Kontrol paneli arayüzü hazırlanırken hata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def update_castle_inventory(self):
+        """Kale envanterini güncelle"""
+        try:
+            if not self.game_controller or not hasattr(self.game_controller, 'castle'):
+                print("UYARI: Kale envanteri güncellenemedi, kale bulunamadı!")
+                return
+                
+            castle = self.game_controller.castle
+            if not castle or not hasattr(castle, 'get_inventory'):
+                print("UYARI: Kale envanteri güncellenemedi, kale envanteri bulunamadı!")
+                return
+                
+            inventory = castle.get_inventory()
+            for item_name, label in self.inventory_labels.items():
+                amount = inventory.get(item_name, 0)
+                label.setText(str(amount))
+                
+            print(f"Kale envanteri güncellendi: {inventory}")
+            
+        except Exception as e:
+            print(f"HATA: Kale envanteri güncellenirken hata: {e}")
             import traceback
             traceback.print_exc()
     
