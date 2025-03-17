@@ -304,7 +304,7 @@ class GroundWidget(QWidget):
                 # Ağacın y pozisyonunu köylülerle aynı hizaya getir
                 # Köylü yüksekliği 40 piksel, ağaç yüksekliği 80 piksel
                 # Ağacın alt kısmı zemin seviyesinde olsun
-                y = ground_y - tree_height + 40  # +40 ile ağacı yukarı kaldırıyoruz
+                y = ground_y - tree_height + 43  # +40 ile ağacı yukarı kaldırıyoruz
                 
                 # Ağaç resmini ölçeklendir
                 scaled_img = self.images["trees"].scaled(tree_width, tree_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
