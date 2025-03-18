@@ -203,6 +203,58 @@ class Villager:
         # Bu metod daha sonra detaylandırılacak
         pass
     
+    def update_behavior_tree(self, dt: float = 0.016) -> None:
+        """Davranış ağacını güncelle"""
+        try:
+            if hasattr(self, 'behavior_tree') and self.behavior_tree:
+                print(f"{self.name} davranış ağacı güncelleniyor...")
+                status = self.behavior_tree.run(self, dt)
+                print(f"{self.name} davranış ağacı durumu: {status}")
+            else:
+                # Davranış ağacı yoksa, klasik mantığı çalıştır
+                self.update_classic_behavior()
+        except Exception as e:
+            print(f"HATA: {self.name} davranış ağacı güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            # Hata durumunda da klasik mantığı çalıştır
+            self.update_classic_behavior()
+    
+    def update_classic_behavior(self) -> None:
+        """Klasik köylü davranış mantığı (davranış ağacı yoksa veya hata durumunda)"""
+        try:
+            # Gece/gündüz durumuna göre davranış seç
+            if hasattr(self, 'game_controller') and self.game_controller:
+                self.is_daytime = self.game_controller.is_daytime
+            
+            # Gece olduysa eve dön
+            if not self.is_daytime:
+                self.go_home()
+                return
+                
+            # Gündüz ise normal davranışları gerçekleştir
+            # Mesleğe göre farklı davranışlar
+            if self.profession == "Oduncu":
+                self.handle_woodcutter()
+            elif self.profession == "İnşaatçı":
+                self.handle_builder()
+            elif self.profession == "Avcı":
+                self.handle_hunter()
+            elif self.profession == "Çiftçi":
+                self.handle_farmer()
+            elif self.profession == "Gardiyan":
+                self.handle_guard()
+            elif self.profession == "Papaz":
+                self.handle_priest()
+            else:
+                # Diğer meslekler sadece dolaşır
+                self.wander()
+                
+            # Animasyonu güncelle
+            self.update_animation()
+        except Exception as e:
+            print(f"HATA: {self.name} klasik davranış hatası: {e}")
+            
     def update_animation(self) -> None:
         """Animasyon karesini güncelle"""
         try:
@@ -425,13 +477,26 @@ class Villager:
     
     def handle_woodcutter(self):
         """Oduncu mantığı"""
+        # Günlük kesim limitini kontrol et
+        if self.trees_cut_today >= self.max_trees_per_day:
+            self.state = "Günlük Kesim Limiti Doldu"
+            self.wander()
+            return
+            
         # Eğer ağaç kesiyorsa
         if self.is_cutting and self.target_tree:
+            # Hareket etmeyi durdur
+            self.is_moving = False
+            # Durumu güncelle
+            self.state = "Ağaç Kesiyor"
+            
             # Ağaç görünür değilse veya listeden kaldırılmışsa
             if not self.target_tree.is_visible:
                 self.is_cutting = False
                 print(f"{self.name} ağaç ID: {self.target_tree.id} kesildi, yeni ağaç arıyor.")
                 self.target_tree = None
+                # Kesim sayısını güncelle
+                print(f"{self.name} bugün {self.trees_cut_today}/{self.max_trees_per_day} ağaç kesti.")
                 # Ağaç kesildikten sonra kısa bir süre bekle, sonra yeni ağaç ara
                 QTimer.singleShot(2000, self.find_tree)
                 # Bu arada biraz dolaş
@@ -448,6 +513,12 @@ class Villager:
     
     def find_tree(self):
         """En yakın uygun ağacı bul"""
+        # Günlük kesim limitini kontrol et
+        if self.trees_cut_today >= self.max_trees_per_day:
+            self.state = "Günlük Kesim Limiti Doldu"
+            self.wander()
+            return
+            
         if not hasattr(self, 'game_controller') or not self.game_controller.trees:
             return
             
@@ -474,12 +545,15 @@ class Villager:
                     self.is_cutting = True
                     self.is_moving = False
                     self.last_cut_time = time.time()
+                    self.state = "Ağaç Kesiyor"
                     print(f"{self.name} ağaç kesmeye başladı. Ağaç ID: {closest_tree.id}")
             else:  # Ağaca doğru git
                 self.move_towards(closest_tree.x)
+                self.state = "Ağaca Gidiyor"
                 print(f"{self.name} ağaca doğru ilerliyor. Mesafe: {min_distance:.1f}")
         else:
             self.wander()  # Ağaç yoksa dolaş
+            self.state = "Ağaç Arıyor"
     
     def move_towards(self, target_x):
         """Hedefe doğru hareket et"""

@@ -24,15 +24,25 @@ class VillagerListItem(QWidget):
             
             # Köylü resmi
             image_label = QLabel()
-            image_path = os.path.join("src", "assets", "villagers", 
-                                    f"{'kadin_koylu' if self.villager.gender == 'Kadın' else 'koylu'}{self.villager.appearance + 1}.png")
             
+            # Köylü görünümüne uygun resim anahtarını oluştur
+            gender = "kadin_koylu" if self.villager.gender == "Kadın" else "koylu"
+            
+            # Dosya yolunu güncelle - ground_widget.py ile uyumlu olmak için {gender}{i} formatını kullan
+            image_path = os.path.join("src", "assets", "villagers", f"{gender}{self.villager.appearance}.png")
+            
+            # Eğer o resim yoksa varsayılan resmi kullan
+            if not os.path.exists(image_path):
+                print(f"UYARI: Köylü resmi bulunamadı: {image_path}, varsayılan resim kullanılıyor")
+                image_path = os.path.join("src", "assets", "villagers", f"{gender}1.png")
+                
+            # Varsayılan resim de yoksa, hata ver ve devam et
             if os.path.exists(image_path):
                 pixmap = QPixmap(image_path)
                 pixmap = pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 image_label.setPixmap(pixmap)
             else:
-                print(f"HATA: Köylü resmi bulunamadı: {image_path}")
+                print(f"HATA: Köylü varsayılan resmi de bulunamadı: {image_path}")
             
             layout.addWidget(image_label)
             
@@ -521,22 +531,33 @@ class ControlPanel(QWidget):
     def update_castle_inventory(self):
         """Kale envanterini güncelle"""
         try:
-            if not self.game_controller or not hasattr(self.game_controller, 'castle'):
-                print("UYARI: Kale envanteri güncellenemedi, kale bulunamadı!")
+            # GameController kontrol et
+            if not hasattr(self, 'game_controller') or not self.game_controller:
+                print("UYARI: GameController bulunamadı!")
                 return
-                
-            castle = self.game_controller.castle
-            if not castle or not hasattr(castle, 'get_inventory'):
-                print("UYARI: Kale envanteri güncellenemedi, kale envanteri bulunamadı!")
-                return
-                
-            inventory = castle.get_inventory()
-            for item_name, label in self.inventory_labels.items():
-                amount = inventory.get(item_name, 0)
-                label.setText(str(amount))
-                
-            print(f"Kale envanteri güncellendi: {inventory}")
             
+            # Kale kontrol et
+            if not hasattr(self.game_controller, 'castle') or not self.game_controller.castle:
+                print("UYARI: Kale bulunamadı! Envanter güncellenemedi.")
+                return
+            
+            # Kale envanterini kontrol et
+            castle = self.game_controller.castle
+            if not hasattr(castle, 'get_inventory'):
+                print("UYARI: Kale get_inventory metodu bulunamadı!")
+                return
+            
+            # Envanteri al ve güncelle
+            inventory = castle.get_inventory()
+            if inventory:
+                for item_name, label in self.inventory_labels.items():
+                    amount = inventory.get(item_name, 0)
+                    label.setText(str(amount))
+                
+                print(f"Kale envanteri güncellendi: {inventory}")
+            else:
+                print("UYARI: Kale envanteri boş!")
+                
         except Exception as e:
             print(f"HATA: Kale envanteri güncellenirken hata: {e}")
             import traceback
@@ -596,7 +617,7 @@ class ControlPanel(QWidget):
             traceback.print_exc()
     
     def update_day_night_style(self, is_daytime):
-        """Gece/gündüz stilini güncelle"""
+        """Gündüz/gece değişiminde stil güncelleme"""
         try:
             if is_daytime:
                 self.time_label.setText("Gündüz")
@@ -619,6 +640,19 @@ class ControlPanel(QWidget):
                 
         except Exception as e:
             print(f"HATA: Gece/gündüz stili güncellenirken hata: {e}")
+    
+    def update_time_label(self):
+        """Kalan süreyi güncelle"""
+        try:
+            if hasattr(self, 'game_controller') and self.game_controller:
+                remaining_minutes, remaining_seconds = self.game_controller.get_remaining_time()
+                time_text = f"{'Gündüz' if self.game_controller.is_daytime else 'Gece'}: {remaining_minutes:02}:{remaining_seconds:02}"
+                
+                if hasattr(self, 'time_label'):
+                    self.time_label.setText(time_text)
+        
+        except Exception as e:
+            print(f"HATA: Zaman etiketi güncellenirken hata: {e}")
     
     def move_to_right(self):
         """Paneli sağ tarafa taşı"""

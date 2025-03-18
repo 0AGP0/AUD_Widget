@@ -312,49 +312,39 @@ class GroundWidget(QWidget):
     def draw_villagers(self, painter):
         """Köylüleri çiz"""
         try:
-            # Oyun kontrolcüsü yoksa çıkış yap
-            if not self.game_controller:
-                return
-                
-            # Köylüler yoksa çıkış yap
-            if not hasattr(self.game_controller, 'villagers') or not self.game_controller.villagers:
-                return
-                
-            # Köylü resimleri yüklü değilse çıkış yap
-            if not self.images["villager"]:
+            print("Köylüler çiziliyor...")
+            if not hasattr(self, 'game_controller') or not self.game_controller:
+                print("HATA: game_controller bulunamadı")
                 return
             
-            # Zemin seviyesini hesapla
+            # Köylüler için görüntü ekranı oluşturmaya hazırlanıyoruz
             ground_y = self.height() - self.ground_height
-            
-            # Tüm köylüleri çiz
-            for villager in self.game_controller.villagers:
-                # Köylü aktif değilse çizme (hasattr ile kontrol et)
-                if hasattr(villager, 'is_active') and not villager.is_active:
-                    continue
-                    
-                # Köylü konumunu hesapla
-                x = int(villager.x - villager.width / 2)
-                y = int(ground_y - villager.height)  # Zemin üzerinde
+
+            for i, villager in enumerate(self.game_controller.villagers):
+                print(f"Köylü çiziliyor: {villager.name}, x={villager.x}, y={villager.y}")
                 
-                # Köylü resmini seç
-                img = None
+                # Köylünün ekrandaki pozisyonu
+                x = int(villager.x)
+                y = ground_y - villager.height  # Zemin üzerinde
+                
+                # Köylünün mesleki tipine göre resmi seç
                 if villager.gender == "Erkek":
                     img_key = f"koylu{villager.appearance}"
-                    if img_key in self.images["villager"]:
-                        img = self.images["villager"][img_key]
                 else:
                     img_key = f"kadin_koylu{villager.appearance}"
-                    if img_key in self.images["villager"]:
-                        img = self.images["villager"][img_key]
+                
+                img = self.images["villager"].get(img_key)
+                print(f"Köylü resim anahtarı: {img_key}, Resim bulundu: {img is not None}")
                 
                 # Eğer resim bulunamadıysa varsayılan resmi kullan
                 if not img:
                     default_key = "koylu1" if villager.gender == "Erkek" else "kadin_koylu1"
                     if default_key in self.images["villager"]:
                         img = self.images["villager"][default_key]
+                        print(f"Varsayılan resim kullanılıyor: {default_key}")
                     else:
                         # Hiç resim yoksa çizme
+                        print(f"HATA: Köylü için resim bulunamadı: {villager.name}")
                         continue
                 
                 # Köylü resmini ölçeklendir
@@ -373,6 +363,7 @@ class GroundWidget(QWidget):
                 
                 # Köylüyü çiz
                 painter.drawPixmap(x, y, scaled_img)
+                print(f"Köylü çizildi: {villager.name}, konum: ({x}, {y})")
                 
                 # Yazı alanı genişliği (köylü genişliğinin 2 katı)
                 text_width = villager.width * 2

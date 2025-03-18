@@ -2,7 +2,17 @@ from typing import List, Optional
 from PyQt5.QtCore import QObject, pyqtSignal, QRect, QTimer, QPoint
 from PyQt5.QtWidgets import QApplication, QDesktopWidget, QMainWindow
 from PyQt5.QtGui import QScreen, QColor
-from src.models.building import Building
+try:
+    from src.models.building import Building
+except ImportError:
+    # Alternatif import yöntemi
+    import sys
+    from pathlib import Path
+    src_dir = str(Path(__file__).resolve().parent.parent.parent)
+    if src_dir not in sys.path:
+        sys.path.append(src_dir)
+    from src.models.building import Building
+
 from src.models.villager import Villager, TestVillager
 from src.models.tree import Tree
 from src.models.building_site import BuildingSite
@@ -492,8 +502,13 @@ class GameController(QObject):
         try:
             # Köylüleri güncelle
             for villager in self.villagers:
-                villager.move()
-                villager.update_animation()
+                # Davranış ağacı ile güncelleme
+                if hasattr(villager, 'update_behavior_tree'):
+                    villager.update_behavior_tree()
+                else:
+                    # Eski hareket sistemi
+                    villager.move()
+                    villager.update_animation()
             
             # Ağaç animasyonlarını güncelle
             for tree in self.trees:
@@ -604,8 +619,10 @@ class GameController(QObject):
             
             # Kontrol panelini güncelle
             if hasattr(self, 'control_panel') and self.control_panel:
-                self.control_panel.update_time_label()
-                
+                # Kontrol paneli hazırsa update_time_label metodunu çağır
+                if hasattr(self.control_panel, 'update_time_label'):
+                    self.control_panel.update_time_label()
+            
         except Exception as e:
             print(f"HATA: Kalan süre güncelleme hatası: {e}")
             import traceback
