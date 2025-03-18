@@ -20,6 +20,8 @@ from src.models.house import House
 import random
 import os
 import time
+from PyQt5.QtCore import QObject, QTimer
+from src.models.ai.dialogue.dialogue_manager import DialogueManager  # Diyalog Yöneticisi İçin Import Ekle
 
 class GameController(QObject):
     """Oyun kontrolcü sınıfı"""
@@ -38,6 +40,10 @@ class GameController(QObject):
         # Gece/Gündüz sistemi için değişkenler
         self.is_daytime = True  # True = Gündüz, False = Gece
         self.remaining_time = self.DAY_DURATION * 1000  # Milisaniye cinsinden
+        
+        # Diyalog yöneticisini oluştur
+        self.dialogue_manager = DialogueManager()
+        self.dialogue_manager.set_game_controller(self)
         
         # Tüm ekranları al
         desktop = QDesktopWidget()
@@ -97,6 +103,11 @@ class GameController(QObject):
             # Gece/gündüz döngüsünü başlat
             print("Gece/gündüz döngüsü başlatılıyor...")
             self.start_day_night_cycle()
+            
+            # Diyalog yöneticisini villager_behaviors'a bağla
+            from src.models.ai.villager_behaviors import set_dialogue_manager
+            set_dialogue_manager(self.dialogue_manager)
+            print("Diyalog yöneticisi davranış sistemine bağlandı.")
             
             # Zemin seviyesini ayarla
             print("Zemin seviyesi ayarlanıyor...")
@@ -724,17 +735,12 @@ class GameController(QObject):
     
     def set_control_panel(self, control_panel):
         """Kontrol panelini ayarla"""
-        try:
-            self.control_panel = control_panel
-            # İlk köylü listesini güncelle
-            if self.villagers:
-                self.villagers_updated.emit(self.villagers)
-            print("Kontrol paneli başarıyla ayarlandı")
-        except Exception as e:
-            print(f"HATA: Kontrol paneli ayarlanırken hata: {e}")
-            import traceback
-            traceback.print_exc()
-    
+        self.control_panel = control_panel
+        
+        # Kontrol panelini diyalog yöneticisine de bağla
+        if hasattr(self, 'dialogue_manager'):
+            self.dialogue_manager.set_game_controller(self)
+
     def create_building_site(self, x: float, y: float) -> BuildingSite:
         """İnşaat alanı oluştur"""
         try:
@@ -915,45 +921,55 @@ class GameController(QObject):
             traceback.print_exc()
     
     def create_dialogue_bubble(self, villager, message):
-        """Köylü için diyalog baloncuğu oluşturur"""
+        """Diyalog baloncuğu oluştur"""
         try:
-            # Köylünün chat_message ve chat_bubble_visible özelliklerini ayarla
+            # Diyalog özelliklerini ayarla
             villager.chat_message = message
             villager.chat_bubble_visible = True
             villager.chat_bubble_time = time.time()
             
-            # Sinyal gönder
+            # Mesajı tüm sisteme bildir
             self.chat_message.emit(villager, message)
             
-            # Konsola yazdır
-            print(f"💬 {villager.name}: {message}")
-            
-            # Bubble ID olarak zamanı kullan
-            bubble_id = time.time()
-            
-            # QTimer.singleShot için (tek seferlik) bir zamanlayıcı oluştur
-            QTimer.singleShot(5000, lambda: self.remove_dialogue_bubble(bubble_id))
-            
-            return bubble_id
+            # Kontrol paneline ilet
+            if hasattr(self, 'control_panel') and self.control_panel:
+                # İlişki seviyesini al (eğer sohbet ortağı varsa)
+                relationship = ""
+                if hasattr(villager, 'chat_partner') and villager.chat_partner:
+                    relationship = villager.get_relationship_with(villager.chat_partner)
+                    # Mesajı panele ekle
+                    self.control_panel.add_dialogue_to_chat(
+                        villager.name, 
+                        villager.chat_partner.name if villager.chat_partner else "Tüm Köy",
+                        message,
+                        relationship
+                    )
+                
+            # İşlem başarılı
+            return True
             
         except Exception as e:
             print(f"HATA: Diyalog baloncuğu oluşturma hatası: {e}")
             import traceback
             traceback.print_exc()
-            return None
-    
-    def remove_dialogue_bubble(self, bubble_id):
-        """Diyalog baloncuğunu kaldırır"""
-        try:
-            # Tüm köylüleri kontrol et
-            for villager in self.villagers:
-                # Baloncuğun zamanı bubble_id ile eşleşiyorsa kaldır
-                if hasattr(villager, 'chat_bubble_time') and villager.chat_bubble_time == bubble_id:
-                    villager.chat_bubble_visible = False
-                    villager.chat_message = ""
-                    return True
-            
             return False
+    
+    def remove_dialogue_bubble(self, villager_or_bubble):
+        """Diyalog baloncuğu kaldır"""
+        try:
+            # Parametre kontrol et (villager veya bubble)
+            if isinstance(villager_or_bubble, bool):
+                # Parametre bir boolean değer (zaten başarıyı temsil ediyor)
+                return True
+            
+            # Villager mi kontrol et
+            if hasattr(villager_or_bubble, 'chat_bubble_visible'):
+                # Diyalog özelliklerini temizle
+                villager_or_bubble.chat_bubble_visible = False
+                villager_or_bubble.chat_message = ""
+            
+            # İşlem başarılı
+            return True
             
         except Exception as e:
             print(f"HATA: Diyalog baloncuğu kaldırma hatası: {e}")

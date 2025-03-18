@@ -102,6 +102,7 @@ Algoritma:
 -Avcı: Ormana gidip avlanır, avın başarısına göre yemek/altın ödülü kazanır.
 -Çiftçi: Tarım alanında ürün yetiştirir; mevsimsel değişiklik ve hava durumu etkisi eklenir.
 -Ürün ve av kalitesi, köylünün özelliklerine (Çalışkan, Dikkatli, vs.) göre modifiye edilir.
+-Ticaret sistemi köylüler arası
 
 [C.4] Gardiyan ve Papaz Mekanikleri:
 

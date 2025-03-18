@@ -1,10 +1,12 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QFrame, QScrollArea, QListWidget, QListWidgetItem,
-                             QProgressBar, QMessageBox)
+                             QProgressBar, QMessageBox, QTabWidget, QTextEdit, QTableWidget,
+                             QTableWidgetItem, QHeaderView)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QPoint
 from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap
 from PyQt5.QtWidgets import QApplication
 import os
+import time
 
 class VillagerListItem(QWidget):
     """Köylü liste öğesi"""
@@ -116,24 +118,55 @@ class VillagerDetailsPanel(QFrame):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
         
+        # Tab Widget
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #3d3d3d;
+                background-color: rgba(44, 62, 80, 0.95);
+                border-radius: 5px;
+            }
+            QTabBar::tab {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                border: 1px solid #3d3d3d;
+                border-bottom: none;
+                border-top-left-radius: 5px;
+                border-top-right-radius: 5px;
+                padding: 5px 10px;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background-color: #36445a;
+                border-bottom: none;
+            }
+            QTabBar::tab:hover {
+                background-color: #2c3e50;
+            }
+        """)
+        
+        # Bilgi Sekmesi
+        self.info_tab = QWidget()
+        info_layout = QVBoxLayout(self.info_tab)
+        
         # Başlık
         self.title_label = QLabel("Köylü Detayları")
         self.title_label.setFont(QFont("Arial", 12, QFont.Bold))
-        layout.addWidget(self.title_label)
+        info_layout.addWidget(self.title_label)
         
         # Temel bilgiler
         self.info_frame = QFrame()
-        info_layout = QVBoxLayout(self.info_frame)
+        info_frame_layout = QVBoxLayout(self.info_frame)
         
         self.name_label = QLabel("İsim: -")
         self.gender_label = QLabel("Cinsiyet: -")
         self.profession_label = QLabel("Meslek: -")
         
-        info_layout.addWidget(self.name_label)
-        info_layout.addWidget(self.gender_label)
-        info_layout.addWidget(self.profession_label)
+        info_frame_layout.addWidget(self.name_label)
+        info_frame_layout.addWidget(self.gender_label)
+        info_frame_layout.addWidget(self.profession_label)
         
-        layout.addWidget(self.info_frame)
+        info_layout.addWidget(self.info_frame)
         
         # İstatistikler
         self.stats_frame = QFrame()
@@ -168,27 +201,84 @@ class VillagerDetailsPanel(QFrame):
             stats_layout.addLayout(stat_layout)
             self.stats[stat_name] = bar
         
-        layout.addWidget(self.stats_frame)
+        info_layout.addWidget(self.stats_frame)
         
         # Özellikler
         self.traits_label = QLabel("Özellikler:")
         self.traits_label.setFont(QFont("Arial", 10, QFont.Bold))
-        layout.addWidget(self.traits_label)
+        info_layout.addWidget(self.traits_label)
         
         self.traits_text = QLabel("-")
         self.traits_text.setWordWrap(True)
-        layout.addWidget(self.traits_text)
+        info_layout.addWidget(self.traits_text)
         
         # Eşinde aradığı özellikler
         self.desired_traits_label = QLabel("Eşinde Aradığı Özellikler:")
         self.desired_traits_label.setFont(QFont("Arial", 10, QFont.Bold))
-        layout.addWidget(self.desired_traits_label)
+        info_layout.addWidget(self.desired_traits_label)
         
         self.desired_traits_text = QLabel("-")
         self.desired_traits_text.setWordWrap(True)
-        layout.addWidget(self.desired_traits_text)
+        info_layout.addWidget(self.desired_traits_text)
         
-        layout.addStretch()
+        # Boşluk bırak
+        info_layout.addStretch()
+        
+        # İlişkiler Sekmesi
+        self.relations_tab = QWidget()
+        relations_layout = QVBoxLayout(self.relations_tab)
+        
+        # İlişki tablosu başlığı
+        relations_title = QLabel("Köylü İlişkileri")
+        relations_title.setFont(QFont("Arial", 12, QFont.Bold))
+        relations_layout.addWidget(relations_title)
+        
+        # İlişki tablosu
+        self.relations_table = QTableWidget()
+        self.relations_table.setColumnCount(3)
+        self.relations_table.setHorizontalHeaderLabels(["Köylü", "İlişki Seviyesi", "Durum"])
+        self.relations_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.relations_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.relations_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.relations_table.setStyleSheet("""
+            QTableWidget {
+                background-color: rgba(30, 30, 30, 0.7);
+                gridline-color: #3d3d3d;
+                border: none;
+            }
+            QTableWidget::item {
+                color: white;
+                padding: 5px;
+            }
+            QHeaderView::section {
+                background-color: #2c3e50;
+                color: white;
+                padding: 5px;
+                border: 1px solid #3d3d3d;
+            }
+        """)
+        relations_layout.addWidget(self.relations_table)
+        
+        # Ruh hali
+        self.mood_frame = QFrame()
+        mood_layout = QHBoxLayout(self.mood_frame)
+        
+        self.mood_label = QLabel("Ruh Hali:")
+        self.mood_label.setFont(QFont("Arial", 10, QFont.Bold))
+        self.mood_value = QLabel("-")
+        
+        mood_layout.addWidget(self.mood_label)
+        mood_layout.addWidget(self.mood_value)
+        mood_layout.addStretch()
+        
+        relations_layout.addWidget(self.mood_frame)
+        
+        # Tabları ekle
+        self.tab_widget.addTab(self.info_tab, "Bilgiler")
+        self.tab_widget.addTab(self.relations_tab, "İlişkiler")
+        
+        # Ana düzene tab widget'ı ekle
+        layout.addWidget(self.tab_widget)
         
         # Stil
         self.setStyleSheet("""
@@ -230,6 +320,168 @@ class VillagerDetailsPanel(QFrame):
         if hasattr(villager, 'desired_traits'):
             desired_traits_text = ", ".join(villager.desired_traits) if villager.desired_traits else "Yok"
             self.desired_traits_text.setText(desired_traits_text)
+        
+        # İlişkileri güncelle
+        self.update_relations(villager)
+        
+        # Ruh halini güncelle
+        if hasattr(villager, 'mood'):
+            self.mood_value.setText(villager.mood)
+            
+            # Ruh haline göre renk
+            mood_colors = {
+                "Mutlu": "#27ae60",  # Yeşil
+                "Üzgün": "#3498db",  # Mavi
+                "Sinirli": "#e74c3c", # Kırmızı
+                "Sakin": "#f1c40f"   # Sarı
+            }
+            
+            color = mood_colors.get(villager.mood, "#ffffff")
+            self.mood_value.setStyleSheet(f"color: {color}; font-weight: bold;")
+    
+    def update_relations(self, villager):
+        """Köylünün ilişkilerini güncelle"""
+        if not hasattr(villager, 'relationships'):
+            return
+            
+        # Tabloyu temizle
+        self.relations_table.setRowCount(0)
+        
+        # İlişkileri ekle
+        row = 0
+        for other_name, value in villager.relationships.items():
+            self.relations_table.insertRow(row)
+            
+            # Köylü adı
+            name_item = QTableWidgetItem(other_name)
+            name_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            
+            # İlişki değeri
+            value_item = QTableWidgetItem(str(value))
+            value_item.setTextAlignment(Qt.AlignCenter)
+            
+            # İlişki durumu
+            if value <= -50:
+                status = "Düşman"
+                color = "#e74c3c"  # Kırmızı
+            elif value <= -20:
+                status = "Hoşlanmıyor"
+                color = "#e67e22"  # Turuncu
+            elif value <= 20:
+                status = "Nötr"
+                color = "#f1c40f"  # Sarı
+            elif value <= 50:
+                status = "İyi"
+                color = "#2ecc71"  # Yeşil
+            else:
+                status = "Dost"
+                color = "#27ae60"  # Koyu yeşil
+            
+            status_item = QTableWidgetItem(status)
+            status_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            status_item.setForeground(QColor(color))
+            
+            self.relations_table.setItem(row, 0, name_item)
+            self.relations_table.setItem(row, 1, value_item)
+            self.relations_table.setItem(row, 2, status_item)
+            
+            row += 1
+
+class ChatPanel(QWidget):
+    """Sohbet paneli"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+        self.dialogue_history = []
+        
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+        
+        # Başlık
+        title_label = QLabel("Köy Sohbetleri")
+        title_label.setFont(QFont("Arial", 12, QFont.Bold))
+        layout.addWidget(title_label)
+        
+        # Sohbet metni
+        self.chat_text = QTextEdit()
+        self.chat_text.setReadOnly(True)
+        self.chat_text.setStyleSheet("""
+            QTextEdit {
+                background-color: rgba(30, 30, 30, 0.7);
+                color: white;
+                border: 1px solid #3d3d3d;
+                border-radius: 5px;
+            }
+        """)
+        layout.addWidget(self.chat_text)
+        
+        # Temizle butonu
+        clear_button = QPushButton("Sohbeti Temizle")
+        clear_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2c3e50;
+                color: white;
+                border: 1px solid #3d3d3d;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #34495e;
+            }
+        """)
+        clear_button.clicked.connect(self.clear_chat)
+        layout.addWidget(clear_button)
+        
+    def add_dialogue(self, speaker, listener, message, relationship=""):
+        """Diyalog ekle"""
+        timestamp = time.strftime("%H:%M:%S")
+        
+        # İlişki durumu rengi
+        relationship_colors = {
+            "Düşman": "#e74c3c",
+            "Hoşlanmıyor": "#e67e22",
+            "Nötr": "#f1c40f",
+            "İyi": "#2ecc71",
+            "Dost": "#27ae60"
+        }
+        
+        rel_color = relationship_colors.get(relationship, "#ffffff")
+        
+        # HTML formatında diyalog ekle
+        html = f"""
+        <p style="margin: 5px;">
+            <span style="color: #3498db; font-weight: bold;">[{timestamp}]</span> 
+            <span style="color: #2ecc71; font-weight: bold;">{speaker}</span>
+            <span style="color: #ffffff;"> → </span>
+            <span style="color: #e74c3c; font-weight: bold;">{listener}</span>
+            <span style="color: {rel_color}; font-style: italic;"> ({relationship})</span>
+            <br>
+            <span style="color: #ffffff; margin-left: 20px;">"{message}"</span>
+        </p>
+        """
+        
+        # Diyaloğu kaydet
+        self.dialogue_history.append({
+            "timestamp": timestamp,
+            "speaker": speaker,
+            "listener": listener,
+            "message": message,
+            "relationship": relationship
+        })
+        
+        # Ekrana ekle
+        self.chat_text.append(html)
+        
+        # Otomatik kaydır
+        scrollbar = self.chat_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+    
+    def clear_chat(self):
+        """Sohbeti temizle"""
+        self.chat_text.clear()
+        self.dialogue_history = []
 
 class ControlPanel(QWidget):
     """Kontrol paneli"""
@@ -446,10 +698,20 @@ class ControlPanel(QWidget):
             """)
             left_layout.addWidget(self.time_label)
             
-            # Sağ panel (detaylar)
+            # Sağ panel (detaylar ve sohbetler)
+            right_panel = QWidget()
+            right_panel.setObjectName("rightPanel")
+            right_layout = QVBoxLayout(right_panel)
+            right_layout.setContentsMargins(0, 0, 0, 0)
+            right_layout.setSpacing(0)
+            
+            # Tab Widget
+            tab_widget = QTabWidget()
+            tab_widget.setObjectName("rightTabs")
+            
+            # Detaylar Sekmesi
             self.details_container = QWidget()
             self.details_container.setObjectName("detailsContainer")
-            self.details_container.setFixedWidth(300)
             
             # Details container için layout oluştur
             details_container_layout = QVBoxLayout(self.details_container)
@@ -463,15 +725,24 @@ class ControlPanel(QWidget):
                     border: 1px solid #132813;
                 }
             """)
-            self.details_container.hide()
             
             # Detay panelini oluştur
             self.details_panel = VillagerDetailsPanel(self.details_container)
             details_container_layout.addWidget(self.details_panel)
             
+            # Sohbet Sekmesi
+            self.chat_panel = ChatPanel()
+            
+            # Tabları ekle
+            tab_widget.addTab(self.details_container, "Köylü Detayları")
+            tab_widget.addTab(self.chat_panel, "Köy Sohbetleri")
+            
+            # Sağ panele tab widget ekle
+            right_layout.addWidget(tab_widget)
+            
             # Ana düzene panelleri ekle
             layout.addWidget(left_panel)
-            layout.addWidget(self.details_container)
+            layout.addWidget(right_panel)
             
             self.setLayout(layout)
             
@@ -481,6 +752,11 @@ class ControlPanel(QWidget):
                     background-color: #1E1E1E;
                 }
                 #leftPanel {
+                    background-color: #1E1E1E;
+                    border: 1px solid #2D2D2D;
+                    border-radius: 10px;
+                }
+                #rightPanel {
                     background-color: #1E1E1E;
                     border: 1px solid #2D2D2D;
                     border-radius: 10px;
@@ -501,6 +777,28 @@ class ControlPanel(QWidget):
                     border: 1px solid #132813;
                     margin: 5px;
                 }
+                #rightTabs::pane {
+                    border: 1px solid #3d3d3d;
+                    background-color: #1E1E1E;
+                    border-radius: 5px;
+                }
+                #rightTabs > QTabBar::tab {
+                    background-color: #1e1e1e;
+                    color: #e0e0e0;
+                    border: 1px solid #3d3d3d;
+                    border-bottom: none;
+                    border-top-left-radius: 5px;
+                    border-top-right-radius: 5px;
+                    padding: 5px 10px;
+                    margin-right: 2px;
+                }
+                #rightTabs > QTabBar::tab:selected {
+                    background-color: #36445a;
+                    border-bottom: none;
+                }
+                #rightTabs > QTabBar::tab:hover {
+                    background-color: #2c3e50;
+                }
                 QMessageBox {
                     background-color: #1E1E1E;
                 }
@@ -520,7 +818,7 @@ class ControlPanel(QWidget):
             """)
             
             # Boyut ve pozisyon
-            self.resize(600, 600)
+            self.resize(700, 600)
             self.move_to_right()
             
         except Exception as e:
@@ -608,11 +906,24 @@ class ControlPanel(QWidget):
             # Detayları güncelle
             self.details_panel.update_villager(villager)
             
-            # Detay panelini göster
-            self.details_container.show()
+            # Detay sekmesine geçiş yap
+            for i in range(self.layout().itemAt(1).widget().layout().count()):
+                widget = self.layout().itemAt(1).widget().layout().itemAt(i).widget()
+                if isinstance(widget, QTabWidget):
+                    widget.setCurrentIndex(0)
+                    break
             
         except Exception as e:
             print(f"HATA: Köylü detayları gösterilirken hata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def add_dialogue_to_chat(self, speaker, listener, message, relationship=""):
+        """Diyaloğu sohbet paneline ekle"""
+        try:
+            self.chat_panel.add_dialogue(speaker, listener, message, relationship)
+        except Exception as e:
+            print(f"HATA: Diyalog ekleme hatası: {e}")
             import traceback
             traceback.print_exc()
     

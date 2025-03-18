@@ -37,6 +37,10 @@ class Villager:
     has_house: bool = False
     house_id: int = None
     
+    # İlişki sistemi
+    relationships: dict = None  # Diğer köylülerle olan ilişkileri
+    mood: str = "Sakin"  # Günlük ruh hali
+    
     # Hareket özellikleri
     speed: float = 0.35  # Hızı 5.0'dan 1.0'a düşürdük
     move_counter: int = 0
@@ -134,9 +138,14 @@ class Villager:
             self.traits = []
         if self.desired_traits is None:
             self.desired_traits = []
+        if self.relationships is None:
+            self.relationships = {}
         
         # Temel Y pozisyonunu ayarla
         self.base_y = self.y
+        
+        # Günlük ruh halini belirle
+        self.set_daily_mood()
     
     def __hash__(self):
         """Hash değerini döndür"""
@@ -612,6 +621,65 @@ class Villager:
         """Oyun kontrolcüsünü ayarla"""
         self.game_controller = game_controller
         self.is_daytime = game_controller.is_daytime  # Gündüz/gece durumunu al
+
+    def set_daily_mood(self):
+        """Günlük ruh halini belirle"""
+        moods = ["Mutlu", "Üzgün", "Sinirli", "Sakin"]
+        self.mood = random.choice(moods)
+        print(f"{self.name} bugün {self.mood} ruh halinde.")
+
+    def get_relationship_with(self, other_villager):
+        """Diğer köylü ile olan ilişki seviyesini döndür"""
+        try:
+            if other_villager.name in self.relationships:
+                relationship_value = self.relationships[other_villager.name]
+                
+                if relationship_value <= -50:
+                    return "Düşman"
+                elif relationship_value <= -20:
+                    return "Hoşlanmıyor"
+                elif relationship_value <= 20:
+                    return "Nötr"
+                elif relationship_value <= 50:
+                    return "İyi"
+                else:
+                    return "Dost"
+            else:
+                return "Nötr"
+            
+        except Exception as e:
+            print(f"HATA: İlişki seviyesi hesaplama hatası: {e}")
+            return "Nötr"
+
+    def increase_relationship(self, other_villager):
+        """Diğer köylü ile olan ilişkiyi artır"""
+        try:
+            if other_villager.name not in self.relationships:
+                self.relationships[other_villager.name] = 0
+            
+            # İlişki değerini artır (maksimum 100)
+            self.relationships[other_villager.name] = min(100, self.relationships[other_villager.name] + 10)
+            
+            # İlişki seviyesini yazdır
+            print(f"{self.name} ile {other_villager.name} arasındaki ilişki arttı. Yeni seviye: {self.get_relationship_with(other_villager)}")
+            
+        except Exception as e:
+            print(f"HATA: İlişki artırma hatası: {e}")
+
+    def decrease_relationship(self, other_villager):
+        """Diğer köylü ile olan ilişkiyi azalt"""
+        try:
+            if other_villager.name not in self.relationships:
+                self.relationships[other_villager.name] = 0
+            
+            # İlişki değerini azalt (minimum -100)
+            self.relationships[other_villager.name] = max(-100, self.relationships[other_villager.name] - 10)
+            
+            # İlişki seviyesini yazdır
+            print(f"{self.name} ile {other_villager.name} arasındaki ilişki azaldı. Yeni seviye: {self.get_relationship_with(other_villager)}")
+            
+        except Exception as e:
+            print(f"HATA: İlişki azaltma hatası: {e}")
 
 class TestVillager(Villager):
     def __init__(self, x, y):
