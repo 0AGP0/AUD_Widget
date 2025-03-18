@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import Qt, QRect, QPoint
-from PyQt5.QtGui import QPainter, QPixmap, QColor, QTransform, QFont, QPen, QBrush
+from PyQt5.QtGui import QPainter, QPixmap, QColor, QTransform, QFont, QPen, QBrush, QPainterPath
 from ..models.villager import Villager, TestVillager
 import random
 import os
@@ -399,6 +399,10 @@ class GroundWidget(QWidget):
                         Qt.AlignCenter, villager.profession
                     )
                 
+                # Diyalog baloncuğunu çiz
+                if hasattr(villager, 'chat_bubble_visible') and villager.chat_bubble_visible and hasattr(villager, 'chat_message') and villager.chat_message:
+                    self.draw_chat_bubble(painter, villager, x, y)
+                
                 # Köylü taşıdığı kaynakları çiz
                 if hasattr(villager, 'carrying') and villager.carrying:
                     resource_text = f"{villager.carrying['type']}: {villager.carrying['amount']}"
@@ -431,6 +435,44 @@ class GroundWidget(QWidget):
             import traceback
             traceback.print_exc()
         
+    def draw_chat_bubble(self, painter, villager, x, y):
+        """Diyalog baloncuğunu çiz"""
+        try:
+            # Baloncuk boyutu
+            bubble_width = max(140, len(villager.chat_message) * 6)  # Metin uzunluğuna göre genişlik
+            bubble_height = 40
+            
+            # Baloncuk pozisyonu
+            bubble_x = x - (bubble_width - villager.width) // 2  # Köylünün üzerinde merkezi
+            bubble_y = y - bubble_height - 40  # Köylünün biraz yukarısında
+            
+            # Baloncuk arka planı (yuvarlak köşeli dikdörtgen)
+            painter.setPen(Qt.black)
+            painter.setBrush(QBrush(QColor(255, 255, 255, 230)))  # Beyaz, hafif saydam
+            painter.drawRoundedRect(bubble_x, bubble_y, bubble_width, bubble_height, 15, 15)
+            
+            # Baloncuk kuyruğu (üçgen)
+            path = QPainterPath()
+            path.moveTo(x, bubble_y + bubble_height)  # Baloncuğun alt ortası
+            path.lineTo(x - 10, bubble_y + bubble_height + 10)  # Sol alt köşe
+            path.lineTo(x + 10, bubble_y + bubble_height + 10)  # Sağ alt köşe
+            path.closeSubpath()
+            painter.fillPath(path, QBrush(QColor(255, 255, 255, 230)))  # Beyaz, hafif saydam
+            painter.strokePath(path, QPen(Qt.black))
+            
+            # Diyalog metnini çiz
+            painter.setPen(Qt.black)
+            painter.setFont(QFont("Arial", 8))
+            
+            # Metin için hizalama
+            text_rect = QRect(bubble_x + 5, bubble_y + 5, bubble_width - 10, bubble_height - 10)
+            painter.drawText(text_rect, Qt.AlignCenter | Qt.TextWordWrap, villager.chat_message)
+            
+        except Exception as e:
+            print(f"HATA: Diyalog baloncuğu çizim hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def mousePressEvent(self, event):
         """Fare tıklama olayı"""
         try:

@@ -25,6 +25,7 @@ class GameController(QObject):
     """Oyun kontrolcü sınıfı"""
     villagers_updated = pyqtSignal(list)  # Köylü listesi güncellendiğinde sinyal gönder
     day_night_changed = pyqtSignal(bool)  # Gece/gündüz değiştiğinde sinyal gönder (True = Gündüz)
+    chat_message = pyqtSignal(object, str)  # Köylü ve mesaj sinyali
     
     DAY_DURATION = 300  # 5 dakika (saniye cinsinden)
     NIGHT_DURATION = 180  # 3 dakika (saniye cinsinden)
@@ -605,6 +606,9 @@ class GameController(QObject):
                         if villager.profession == "Oduncu":
                             villager.trees_cut_today = 0
                             print(f"{villager.name} yeni güne başladı, kesme hakkı: {villager.max_trees_per_day}")
+                        elif villager.profession == "İnşaatçı":
+                            villager.buildings_built = 0
+                            print(f"{villager.name} yeni güne başladı, inşaat hakkı: {villager.max_buildings_per_day}")
                     self.start_villagers_wandering()
                 else:
                     self.remaining_time = self.NIGHT_DURATION * 1000  # Gece süresi
@@ -908,4 +912,51 @@ class GameController(QObject):
         except Exception as e:
             print(f"HATA: {self.name} eve dönme hatası: {e}")
             import traceback
-            traceback.print_exc() 
+            traceback.print_exc()
+    
+    def create_dialogue_bubble(self, villager, message):
+        """Köylü için diyalog baloncuğu oluşturur"""
+        try:
+            # Köylünün chat_message ve chat_bubble_visible özelliklerini ayarla
+            villager.chat_message = message
+            villager.chat_bubble_visible = True
+            villager.chat_bubble_time = time.time()
+            
+            # Sinyal gönder
+            self.chat_message.emit(villager, message)
+            
+            # Konsola yazdır
+            print(f"💬 {villager.name}: {message}")
+            
+            # Bubble ID olarak zamanı kullan
+            bubble_id = time.time()
+            
+            # QTimer.singleShot için (tek seferlik) bir zamanlayıcı oluştur
+            QTimer.singleShot(5000, lambda: self.remove_dialogue_bubble(bubble_id))
+            
+            return bubble_id
+            
+        except Exception as e:
+            print(f"HATA: Diyalog baloncuğu oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def remove_dialogue_bubble(self, bubble_id):
+        """Diyalog baloncuğunu kaldırır"""
+        try:
+            # Tüm köylüleri kontrol et
+            for villager in self.villagers:
+                # Baloncuğun zamanı bubble_id ile eşleşiyorsa kaldır
+                if hasattr(villager, 'chat_bubble_time') and villager.chat_bubble_time == bubble_id:
+                    villager.chat_bubble_visible = False
+                    villager.chat_message = ""
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"HATA: Diyalog baloncuğu kaldırma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            return False 

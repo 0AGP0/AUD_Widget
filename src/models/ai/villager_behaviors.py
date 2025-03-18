@@ -3,9 +3,9 @@ from src.models.ai.behavior_tree import (
     ActionNode, ConditionNode, InverterNode, DelayNode,
     BlackboardNode, RandomSelectorNode
 )
-from src.models.ai.dialogue_system import create_chat_behavior_tree
 import random
 import time
+from PyQt5.QtCore import QTimer
 
 # Köylü durumları için sabitler
 IDLE = "Boşta"
@@ -21,7 +21,7 @@ def create_villager_behavior_tree(villager):
     # Ana seçici düğüm (en üst düzey karar verici)
     root = SelectorNode("Ana Davranış Seçici")
     
-    # 1. Sohbet davranışı (en yüksek öncelik)
+    # 1. Temel sohbet davranışı (basitleştirildi)
     chat_behavior = create_chat_behavior(villager)
     root.add_child(chat_behavior)
     
@@ -40,7 +40,7 @@ def create_villager_behavior_tree(villager):
     return root
 
 def create_chat_behavior(villager):
-    """Köylü için sohbet davranışını oluşturur"""
+    """Köylü için basit sohbet davranışını oluşturur"""
     # Sohbet sekansı
     chat_sequence = SequenceNode("Sohbet Sekansı")
     
@@ -55,9 +55,10 @@ def create_chat_behavior(villager):
                             lambda v, dt: update_villager_state(v, CHATTING))
     chat_sequence.add_child(update_state)
     
-    # Sohbet ağacı
-    chat_tree = create_chat_behavior_tree(villager)
-    chat_sequence.add_child(chat_tree)
+    # Basit kalma eylemi - diyalog sistemi yerine basit bir bekleme ekliyoruz
+    stay_in_place = ActionNode("Sohbet Sırasında Yerinde Kal", 
+                            lambda v, dt: NodeStatus.RUNNING)
+    chat_sequence.add_child(stay_in_place)
     
     return chat_sequence
 
@@ -217,7 +218,7 @@ def create_idle_behavior(villager):
     
     # Belirli bir olasılıkla (düşük) rastgele sohbet başlat
     random_chat_chance = ConditionNode("Sohbet Şansı", 
-                                     lambda v, dt: random.random() < 0.005)  # %0.5 olasılık
+                                     lambda v, dt: random.random() < 0.05)  # %5 olasılık
     random_chat_sequence.add_child(random_chat_chance)
     
     # Yakında başka bir köylü var mı kontrol et
@@ -372,7 +373,7 @@ def find_nearby_villager(villager):
         # Tüm köylüleri kontrol et
         for other in villager.game_controller.villagers:
             # Kendisi değilse ve yakındaysa
-            if other != villager and not other.is_chatting:
+            if other != villager:
                 # Mesafeyi hesapla
                 distance = ((villager.x - other.x) ** 2 + (villager.y - other.y) ** 2) ** 0.5
                 if distance < 100:  # 100 birim mesafe içinde
@@ -386,21 +387,30 @@ def find_nearby_villager(villager):
         return None
 
 def start_chat_with_nearby_villager(villager):
-    """Yakındaki bir köylüyle sohbet başlatır"""
+    """Yakındaki bir köylüyle basit etkileşim başlatır"""
     try:
-        # Yakındaki köylüyü bul
-        partner = find_nearby_villager(villager)
-        if not partner:
+        # Yakında köylü var mı bul
+        nearby_villager = find_nearby_villager(villager)
+        
+        if not nearby_villager:
+            print(f"{villager.name} yakınında etkileşim kuracak köylü bulamadı.")
             return NodeStatus.FAILURE
+            
+        print(f"{villager.name}, {nearby_villager.name} ile selamlaştı.")
         
-        # Sohbet başlatma işlevini çağır
-        if hasattr(villager, 'game_controller') and hasattr(villager.game_controller, 'interaction_manager'):
-            success = villager.game_controller.interaction_manager.start_chat(villager, partner)
-            return NodeStatus.SUCCESS if success else NodeStatus.FAILURE
+        # Basit bir selamlama mesajı göster
+        if hasattr(villager, 'game_controller') and villager.game_controller:
+            message = f"Selam {nearby_villager.name}!"
+            # Diyalog baloncuğunu göster
+            bubble = villager.game_controller.create_dialogue_bubble(villager, message)
+            if bubble:
+                # 5 saniye sonra baloncuğu kaldır
+                QTimer.singleShot(5000, lambda: villager.game_controller.remove_dialogue_bubble(bubble))
         
-        return NodeStatus.FAILURE
+        return NodeStatus.SUCCESS
+        
     except Exception as e:
-        print(f"HATA: {villager.name} sohbet başlatma hatası: {e}")
+        print(f"Etkileşim başlatılırken hata: {str(e)}")
         import traceback
         traceback.print_exc()
         return NodeStatus.FAILURE 

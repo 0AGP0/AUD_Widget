@@ -38,7 +38,7 @@ class Villager:
     house_id: int = None
     
     # Hareket özellikleri
-    speed: float = 1.0  # Hızı 5.0'dan 1.0'a düşürdük
+    speed: float = 0.35  # Hızı 5.0'dan 1.0'a düşürdük
     move_counter: int = 0
     max_move_time: int = 50
     is_wandering: bool = True
@@ -63,8 +63,8 @@ class Villager:
     rotation_speed: float = 0.3  # Eğilme hızı
     rotation_direction: int = 1  # Eğilme yönü (1: sağa, -1: sola)
     last_rotation_time: float = 0.0  # Son eğilme zamanı
-    rotation_interval: float = 0.4  # Her 0.4 saniyede bir yön değiştir
-    max_rotation: float = 8.0  # Maksimum eğilme açısı
+    rotation_interval: float = 0.2  # Her 0.4 saniyede bir yön değiştir
+    max_rotation: float = 10.0  # Maksimum eğilme açısı
     current_rotation: float = 0.0  # Mevcut eğilme açısı
     
     # Oduncu özellikleri
@@ -203,58 +203,42 @@ class Villager:
         # Bu metod daha sonra detaylandırılacak
         pass
     
-    def update_behavior_tree(self, dt: float = 0.016) -> None:
-        """Davranış ağacını güncelle"""
+    def initialize_behavior_tree(self):
+        """Davranış ağacını başlat"""
         try:
-            if hasattr(self, 'behavior_tree') and self.behavior_tree:
-                print(f"{self.name} davranış ağacı güncelleniyor...")
-                status = self.behavior_tree.run(self, dt)
-                print(f"{self.name} davranış ağacı durumu: {status}")
-            else:
-                # Davranış ağacı yoksa, klasik mantığı çalıştır
-                self.update_classic_behavior()
+            from src.models.ai.villager_behaviors import create_villager_behavior_tree
+            self.behavior_tree = create_villager_behavior_tree(self)
+            print(f"{self.name} için davranış ağacı oluşturuldu")
         except Exception as e:
-            print(f"HATA: {self.name} davranış ağacı güncelleme hatası: {e}")
+            print(f"HATA: Davranış ağacı oluşturma hatası: {e}")
+            self.behavior_tree = None
             import traceback
             traceback.print_exc()
-            # Hata durumunda da klasik mantığı çalıştır
-            self.update_classic_behavior()
     
-    def update_classic_behavior(self) -> None:
-        """Klasik köylü davranış mantığı (davranış ağacı yoksa veya hata durumunda)"""
+    def update_behavior_tree(self):
+        """Davranış ağacını güncelle"""
         try:
-            # Gece/gündüz durumuna göre davranış seç
-            if hasattr(self, 'game_controller') and self.game_controller:
-                self.is_daytime = self.game_controller.is_daytime
-            
-            # Gece olduysa eve dön
-            if not self.is_daytime:
-                self.go_home()
-                return
+            if self.behavior_tree:
+                dt = 0.016  # ~60 FPS için 1/60
+                status = self.behavior_tree.run(self, dt)
+                # Davranış ağacı durumunu güncelle, hareketleri yönetmeye devam et
+                self.move()
+                self.update_animation()
                 
-            # Gündüz ise normal davranışları gerçekleştir
-            # Mesleğe göre farklı davranışlar
-            if self.profession == "Oduncu":
-                self.handle_woodcutter()
-            elif self.profession == "İnşaatçı":
-                self.handle_builder()
-            elif self.profession == "Avcı":
-                self.handle_hunter()
-            elif self.profession == "Çiftçi":
-                self.handle_farmer()
-            elif self.profession == "Gardiyan":
-                self.handle_guard()
-            elif self.profession == "Papaz":
-                self.handle_priest()
-            else:
-                # Diğer meslekler sadece dolaşır
-                self.wander()
-                
-            # Animasyonu güncelle
-            self.update_animation()
+                # Özel durum kontrolleri
+                if self.state == "Dolaşıyor" and not self.is_moving:
+                    # Durması gereken bir durum değilse hareketi devam ettir
+                    if random.random() < 0.02:  # %2 şans ile yeni hedef belirle
+                        self.wander()
+                    
         except Exception as e:
-            print(f"HATA: {self.name} klasik davranış hatası: {e}")
-            
+            print(f"HATA: {self.name} için davranış ağacı güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            # Hata durumunda güvenli bir şekilde hareketi devam ettir
+            self.move()
+            self.update_animation()
+    
     def update_animation(self) -> None:
         """Animasyon karesini güncelle"""
         try:

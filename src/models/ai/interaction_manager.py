@@ -4,7 +4,6 @@ from typing import Dict, List, Optional
 
 from src.models.ai.rule_based_ai import RuleBasedAI
 from PyQt5.QtCore import QTimer, QObject
-from src.models.ai.dialogue_system import DialogueManager, DialogueType, EmotionType, create_dialogue_system
 from src.models.ai.behavior_tree import BlackboardNode
 
 class InteractionManager(QObject):
@@ -36,7 +35,6 @@ class InteractionManager(QObject):
         
         self.active_chats = {}  # {chat_id: (initiator, partner, start_time, duration)}
         self.chat_id_counter = 0
-        self.dialogue_manager = create_dialogue_system()
         
         # Rastgele etkileşim zamanını ayarla
         self.next_random_interaction_time = time.time() + random.uniform(30, 60)  # 30-60 saniye arası
@@ -96,342 +94,105 @@ class InteractionManager(QObject):
                 self.apply_decision(villager, decision)
     
     def start_chat(self, initiator, partner):
-        """Köylüler arasında sohbet başlat"""
+        """İki köylü arasında basit etkileşim başlatır"""
         try:
+            # Etkileşime hazır olup olmadıklarını kontrol et
             if not self.can_chat(initiator, partner):
+                print(f"{initiator.name} ve {partner.name} arasında etkileşim başlatılamadı.")
                 return False
                 
-            # Köylülerin sohbet etmeleri için yakın durmaları lazım
-            distance = abs(initiator.x - partner.x)
-            if distance > 50:  # 50 pikselden fazla uzaklıkta ise önce yaklaşsın
-                initiator.state = f"{partner.name} ile Konuşmaya Gidiyor"
-                return False
-                
-            print(f"Sohbet başlatılıyor: {initiator.name} -> {partner.name}")
+            # Etkileşim başlat
+            print(f"{initiator.name} ve {partner.name} arasında etkileşim başladı.")
             
-            # Köylülerin sohbet bilgilerini ayarla
-            initiator.is_chatting = True
-            initiator.chat_partner = partner
-            initiator.chat_time = 0.0
-            initiator.chat_duration = random.uniform(30.0, 60.0)  # 30-60 saniye arası sohbet
-            initiator.is_chat_initiator = True
-            initiator.last_message_time = 0
-            initiator.chat_topic = random.choice(initiator.CHAT_TOPICS)  # Rastgele bir konu seç
-            
-            partner.is_chatting = True
-            partner.chat_partner = initiator
-            partner.chat_time = 0.0  
-            partner.chat_duration = initiator.chat_duration
-            partner.is_chat_initiator = False
-            partner.last_message_time = 0
-            partner.chat_topic = initiator.chat_topic  # Aynı konuyu konuşsunlar
-            
-            # Köylülerin durumlarını güncelle
-            initiator.state = f"{partner.name} ile Sohbet Ediyor"
-            partner.state = f"{initiator.name} ile Sohbet Ediyor"
-            
-            # Hareketlerini durdur
-            initiator.is_moving = False
-            partner.is_moving = False
-            
-            # Birbirlerine dönük olsunlar
-            if initiator.x < partner.x:
-                initiator.direction = 1  # Sağa bak
-                initiator.direction_x = 1
-                partner.direction = -1  # Sola bak
-                partner.direction_x = -1
-            else:
-                initiator.direction = -1  # Sola bak
-                initiator.direction_x = -1
-                partner.direction = 1  # Sağa bak
-                partner.direction_x = 1
-            
-            # Selamlaşma mesajlarını göster (ilk kısmın bitiminde karşı taraf cevap versin)
-            chat_delay = 1000  # 1 saniye sonra selamlaş
-            
-            # Diyalog başlatan kişiden gelen ilk mesaj (selamlaşma)
-            initiator.chat_topic = "selamlaşma"  # İlk mesaj selamlaşma
-            greeting_message = initiator.generate_chat_message(is_initiator=True)
-            
-            # İlk mesaj gecikmesi
-            QTimer.singleShot(chat_delay, lambda: self.show_chat_message(initiator, greeting_message))
-            
-            # Karşı tarafın cevap vermesi için zamanlayıcı
-            QTimer.singleShot(chat_delay + 2000, lambda: self.partner_respond_greeting(initiator, partner))
-            
-            # Sohbetin devam etmesi için zamanlayıcı
-            QTimer.singleShot(chat_delay + 5000, lambda: self.continue_chat(initiator, partner))
+            # Basit bir selamlama mesajı göster
+            if hasattr(initiator, 'show_dialogue'):
+                initiator.show_dialogue(f"Selam {partner.name}!", 2.0)
             
             # İstatistikleri güncelle
             self.total_chats += 1
-            self.recent_chats.append((initiator.name, partner.name, time.time()))
+            self.recent_chats.append((initiator, partner, time.time()))
             
-            # Son sohbet zamanını güncelle
-            initiator.last_chat_time = time.time()
-            partner.last_chat_time = time.time()
-            
+            # Başarılı
             return True
             
         except Exception as e:
-            print(f"HATA: Sohbet başlatma hatası: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-
-    def partner_respond_greeting(self, initiator, partner):
-        """Karşı tarafın selamlaşmaya cevap vermesi"""
-        try:
-            # Köylülerin hala sohbet ettiğini kontrol et
-            if not initiator.is_chatting or not partner.is_chatting:
-                return
-                
-            # Karşı tarafın cevap vermesi
-            partner.chat_topic = "selamlaşma"  # Cevap olarak selamlaşma
-            response_message = partner.generate_chat_message(is_initiator=False)
-            
-            # Yanıt mesajını göster
-            self.show_chat_message(partner, response_message)
-            
-        except Exception as e:
-            print(f"HATA: Selamlaşma cevabı hatası: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def continue_chat(self, initiator, partner):
-        """Sohbeti devam ettir"""
-        try:
-            # Köylülerin hala sohbet ettiğini kontrol et
-            if not initiator.is_chatting or not partner.is_chatting:
-                return
-                
-            # Sohbet süresini kontrol et
-            if initiator.chat_time > initiator.chat_duration:
-                self.end_chat(initiator, partner, "Süre doldu")
-                return
-                
-            # Sohbet konusunu belirle - ilk mesajdan sonra rastgele bir konu seçelim
-            if initiator.chat_topic == "selamlaşma":
-                # İlk konuşmadan sonra artık normal bir konuya geçelim
-                new_topic = random.choice([t for t in initiator.CHAT_TOPICS if t != "selamlaşma"])
-                
-                # Mesleğe göre konu seçme olasılığını artır
-                if initiator.profession:
-                    profession_topic_map = {
-                        "Oduncu": "meslek",
-                        "İnşaatçı": "ev",
-                        "Avcı": "meslek",
-                        "Gardiyan": "dedikodu",
-                        "Papaz": "felsefe",
-                        "Çiftçi": "yemek"
-                    }
-                    
-                    if initiator.profession in profession_topic_map:
-                        if random.random() < 0.6:  # %60 şans ile mesleğe uygun konu
-                            new_topic = profession_topic_map[initiator.profession]
-                
-                # Karakteristik özelliklere göre konu seçme olasılığını artır
-                trait_topic_map = {
-                    "Dedikodu": "dedikodu",
-                    "Esprili": "şaka",
-                    "Romantik": "ilişki",
-                    "Yobaz": "felsefe",
-                    "Karamsar": "hava",
-                    "İyimser": "günlük"
-                }
-                
-                for trait, topic in trait_topic_map.items():
-                    if trait in initiator.traits and random.random() < 0.7:  # %70 şans
-                        new_topic = topic
-                        break
-                
-                # Konuyu ayarla
-                initiator.chat_topic = new_topic
-                partner.chat_topic = new_topic
-            
-            # Başlatan kişinin mesajını oluştur ve göster
-            chat_message = initiator.generate_chat_message(is_initiator=True)
-            self.show_chat_message(initiator, chat_message)
-            
-            # Karşı tarafın cevap vermesi için zamanlayıcı (5 saniye bekle)
-            QTimer.singleShot(5000, lambda: self.partner_respond(initiator, partner))
-            
-            # Sohbet süresini 5 saniye artır (her konuşma için)
-            initiator.chat_time += 5
-            partner.chat_time += 5
-            
-        except Exception as e:
-            print(f"HATA: Sohbet devam hatası: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def partner_respond(self, initiator, partner):
-        """Karşı tarafın yanıt vermesi"""
-        try:
-            # Köylülerin hala sohbet ettiğini kontrol et
-            if not initiator.is_chatting or not partner.is_chatting:
-                return
-                
-            # Sohbet süresini kontrol et
-            if initiator.chat_time > initiator.chat_duration:
-                self.end_chat(initiator, partner, "Süre doldu")
-                return
-                
-            # Karşı tarafın yanıt vermesi
-            response_message = partner.generate_chat_message(is_initiator=False)
-            self.show_chat_message(partner, response_message)
-            
-            # Yeni bir mesaj eklemek için rastgele şans
-            # İlişki puanı yüksekse veya belli özellikler varsa devam etme şansı artar
-            continue_chance = 0.7  # Temel devam etme şansı
-            
-            # İlişki puanına göre düzenle
-            relationship = initiator.get_relationship_with(partner.name)
-            if relationship > 70:
-                continue_chance += 0.2
-            elif relationship < 30:
-                continue_chance -= 0.2
-                
-            # Kişilik özelliklerine göre düzenle
-            if "Karizmatik" in initiator.traits or "Karizmatik" in partner.traits:
-                continue_chance += 0.1
-            if "İlgisiz" in initiator.traits or "İlgisiz" in partner.traits:
-                continue_chance -= 0.2
-            if "Esprili" in initiator.traits or "Esprili" in partner.traits:
-                continue_chance += 0.1
-                
-            # Sohbetin devam etme şansı
-            if random.random() < continue_chance:
-                # Başlatan kişinin tekrar yanıt vermesi için zamanlayıcı (5 saniye bekle)
-                QTimer.singleShot(5000, lambda: self.initiator_respond(initiator, partner))
-            else:
-                # Sohbeti sonlandır
-                QTimer.singleShot(3000, lambda: self.end_chat(initiator, partner, "Doğal sonlanma"))
-            
-            # Sohbet süresini 5 saniye artır (her konuşma için)
-            initiator.chat_time += 5
-            partner.chat_time += 5
-            
-        except Exception as e:
-            print(f"HATA: Partner yanıt hatası: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def initiator_respond(self, initiator, partner):
-        """Başlatan kişinin tekrar yanıt vermesi"""
-        try:
-            # Köylülerin hala sohbet ettiğini kontrol et
-            if not initiator.is_chatting or not partner.is_chatting:
-                return
-                
-            # Sohbet süresini kontrol et
-            if initiator.chat_time > initiator.chat_duration:
-                self.end_chat(initiator, partner, "Süre doldu")
-                return
-                
-            # Sohbeti devam ettirme şansını kontrol et - konu değişimini de düşünelim
-            topic_change_chance = 0.3  # %30 şans ile konu değişebilir
-            
-            # Şu andaki konuya bağlı olarak değişiklik şansını ayarla
-            if initiator.chat_topic == "dedikodu":
-                topic_change_chance = 0.4  # Dedikodu sonrası konu değişme olasılığı daha yüksek
-            elif initiator.chat_topic == "şaka":
-                topic_change_chance = 0.6  # Şaka sonrası konu değişme olasılığı çok yüksek
-                
-            # Konu değişimi gerçekleşti mi?
-            if random.random() < topic_change_chance:
-                # Yeni bir konu seç (mevcut konudan farklı olarak)
-                available_topics = [t for t in initiator.CHAT_TOPICS if t != initiator.chat_topic and t != "selamlaşma"]
-                if available_topics:
-                    new_topic = random.choice(available_topics)
-                    initiator.chat_topic = new_topic
-                    partner.chat_topic = new_topic
-                    
-                    # Konu değişimini bildir
-                    print(f"Konu değişti: {initiator.name} ve {partner.name} arasında yeni konu: {new_topic}")
-            
-            # Başlatan kişinin yanıt vermesi
-            response_message = initiator.generate_chat_message(is_initiator=True)
-            self.show_chat_message(initiator, response_message)
-            
-            # Sohbeti devam ettirme şansını kontrol et
-            continue_chance = 0.6  # Temel devam etme şansı
-            
-            # İlişki puanına göre düzenle
-            relationship = initiator.get_relationship_with(partner.name)
-            if relationship > 70:
-                continue_chance += 0.2
-            elif relationship < 30:
-                continue_chance -= 0.2
-                
-            # Kişilik özelliklerine göre düzenle
-            if "Karizmatik" in initiator.traits or "Karizmatik" in partner.traits:
-                continue_chance += 0.1
-            if "İlgisiz" in initiator.traits or "İlgisiz" in partner.traits:
-                continue_chance -= 0.2
-            if "Esprili" in initiator.traits or "Esprili" in partner.traits:
-                continue_chance += 0.1
-                
-            # Sohbetin devam etme şansı
-            if random.random() < continue_chance:
-                # Karşı tarafın yanıt vermesi için zamanlayıcı (5 saniye bekle)
-                QTimer.singleShot(5000, lambda: self.partner_respond(initiator, partner))
-            else:
-                # Sohbeti sonlandır
-                QTimer.singleShot(3000, lambda: self.end_chat(initiator, partner, "Doğal sonlanma"))
-            
-            # Sohbet süresini 5 saniye artır (her konuşma için)
-            initiator.chat_time += 5
-            partner.chat_time += 5
-            
-        except Exception as e:
-            print(f"HATA: Başlatan yanıt hatası: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def end_chat(self, initiator, partner, reason="Bilinmeyen"):
-        """Sohbeti sonlandır"""
-        try:
-            # Her iki köylü de artık konuşmuyor
-            initiator.is_chatting = False
-            initiator.chat_partner = None
-            initiator.chat_topic = ""
-            initiator.is_moving = False  # Hareket durumunu sıfırla
-            
-            partner.is_chatting = False
-            partner.chat_partner = None
-            partner.chat_topic = ""
-            partner.is_moving = False  # Hareket durumunu sıfırla
-            
-            # İlişki puanlarını güncelle
-            relationship_change = initiator.update_relationship_after_chat()
-            
-            # Sohbet sonrası bekleme süresi (cooldown)
-            cooldown_time = random.uniform(20, 40)  # 20-40 saniye arası bekleme
-            initiator.chat_cooldown = cooldown_time
-            partner.chat_cooldown = cooldown_time
-            
-            # Durumlarını güncelle
-            initiator.state = "Dolaşıyor"
-            partner.state = "Dolaşıyor"
-            
-            # Yeni hedefler belirle
-            QTimer.singleShot(1000, initiator.find_new_target)
-            QTimer.singleShot(1500, partner.find_new_target)
-            
-            # Sohbet sonu bilgilerini logla
-            print(f"Sohbet sonlandı: {initiator.name} ve {partner.name} arasında. Neden: {reason}, İlişki değişimi: {relationship_change}")
-            
-            # İstatistikleri güncelle
-            self.completed_chats += 1
-            
-            return True
-            
-        except Exception as e:
-            print(f"HATA: Sohbet sonlandırma hatası: {e}")
+            print(f"HATA: Etkileşim başlatılırken hata: {e}")
             import traceback
             traceback.print_exc()
             return False
     
+    def continue_chat(self, speaker, listener):
+        """Sohbeti devam ettirir"""
+        try:
+            # Hala sohbet ediyor mu kontrol et
+            if not hasattr(speaker, 'is_chatting') or not speaker.is_chatting:
+                return
+                
+            # Rastgele cevaplar
+            responses = [
+                f"İyiyim, teşekkür ederim {listener.name}. Sen nasılsın?",
+                f"Çok iyiyim, bugün hava çok güzel!",
+                f"Biraz yorgunum ama idare ediyorum.",
+                f"Keyifli bir gün, değil mi {listener.name}?",
+                f"Bugün çok çalıştım, biraz dinlenmem gerek."
+            ]
+            
+            # Rastgele bir cevap seç
+            response = random.choice(responses)
+            
+            # Cevabı göster
+            if hasattr(speaker, 'show_dialogue'):
+                speaker.show_dialogue(response, 3.0)
+            
+            # Konuşma sırasını değiştir
+            speaker.is_speaking = True
+            listener.is_speaking = False
+            
+            # Karşılık vermesi için zamanlayıcı oluştur (dinleyici konuşacak)
+            QTimer.singleShot(3000, lambda: self.continue_chat(listener, speaker))
+            
+        except Exception as e:
+            print(f"HATA: Sohbete devam edilirken hata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def end_chat(self, chat_id):
+        """Belirli bir sohbeti sonlandırır"""
+        try:
+            if chat_id not in self.active_chats:
+                return
+                
+            # Sohbet bilgilerini al
+            initiator, partner, start_time, duration = self.active_chats[chat_id]
+            
+            # Köylülerin durumlarını temizle
+            if hasattr(initiator, 'is_chatting'):
+                initiator.is_chatting = False
+                initiator.is_speaking = False
+                initiator.chat_partner = None
+                
+            if hasattr(partner, 'is_chatting'):
+                partner.is_chatting = False
+                partner.is_speaking = False
+                partner.chat_partner = None
+            
+            # Aktif sohbetlerden kaldır
+            del self.active_chats[chat_id]
+            
+            # İstatistikleri güncelle
+            self.completed_chats += 1
+            
+            # Sohbet sonunda veda mesajı
+            if hasattr(initiator, 'show_dialogue') and random.random() < 0.5:
+                initiator.show_dialogue("Görüşmek üzere!", 2.0)
+                
+            print(f"{initiator.name} ve {partner.name} arasındaki sohbet sona erdi.")
+            
+        except Exception as e:
+            print(f"HATA: Sohbet sonlandırılırken hata: {e}")
+            import traceback
+            traceback.print_exc()
+
     def apply_decision(self, villager, decision):
         """Köylünün kararını uygula"""
         if decision == "odun_kes":
@@ -681,7 +442,7 @@ class InteractionManager(QObject):
             # Sohbetleri sonlandır
             for chat_id in chats_to_end:
                 initiator, partner, _, _ = self.active_chats[chat_id]
-                self.end_chat(initiator, partner)
+                self.end_chat(chat_id)
         except Exception as e:
             print(f"HATA: Aktif sohbet kontrolü hatası: {e}")
             import traceback
