@@ -1,0 +1,213 @@
+YAPILACAKLAR LİSTESİ:
+
+1. [X] Önce gereksiz dosyaların hepsi kaldırılıp oyunu nesne yönelimli programlamyla baştan yazacağız
+2. [X] Oyundaki bütün yapıların ve köylülerin üzerinde yürüyeceği zemin yerleştirilecek. Bu zemin masaüstünün en sol altından en sağ al köşesine kadar uzanan bir yapı olacak. Bu yapı bir widget şeklinde olacağı için masüstü görünür şekilde olacak.
+3. [X] Zeminin asseti zemin.png nin yan yana koyulmasıyla oluşacak. En soldan en sağa kadar yan yana dizilecek bu png. kaç tane gerekiyorsa o kadar sıralansın.
+4. [X] Zeminin en sol köşesinden 100 piksel içerde bir kale koy ve asset olarakta kale.png assetini koy.
+5. [X] Ekranın solundan sağına doğru sıklığı artacak şekilde ağaçlar yerleştir zeminin üstüne. Asset olarakta agac.png koy.
+6. [X] Oyunun başında kalenin etrafında 4 tane köylü oluştur. en az 1 tanesi kadın ve erkek olmak zorunda. Bu köylüler Bu zemin üzerinde Hayatlarını geçirecek olan yapay zekalar.
+7. [X] Bu köylülere meslekler ata."Oduncu, Madenci, İnşaatcı, İşsiz, Sanatçı".Bu köylülere daha sonra mesleklerinin özellikleri atanacak.
+8. [X] Köylüler daha işlerinin özellikleri verilmediği için rastgele bir şekilde haritada dolaşsınlar bu dolaşmanın detaylı özelliklerinide daha sonra yapacağız.
+9. [X] Bir kontrol paneli yap bu panelde Köylülerin resimleriyle birlikte isimleri ve meslekleri görünsün. Panelde köylünün üstüne tıklayınca köylünün şu değerleri görünsün. "Sağlık, Para, Mutluluk, Karizma, Eğitim, Yaş" bu özelliklerin ne işe yarayacağını daha sonra ekleyeceğiz. Kontrol paneline birde oyunu kapatmak için köşesine bir çarpı butonu koy. Birde oyunu simge boyutuna küçültük bir buton daha koy
+10. [X] Oyuna gece gündüz ekleyelim. Gündüz 5 dk sürsün gece 3 dk sürsün. Gece veya gündüz olduğu kontrol panelinde belirtilsin. Gece olunca köylüler kaleye dönsün(Daha sonra ev eklediğimiz zaman evlerine dönücekler şimdilik kalye dönsünler). Sabah olunca tekrar dolaşmaya devam etsinler.
+
+
+Not: Her değişiklik için önce onay alınacak!
+
+1. Yeni Karakteristik Özellikler
+
+Tembel: Mesleğini yaparken diğer köylülere göre erken işi bırakıp dolaşmaya çıkar.
+Çalışkan: Mesleğinde diğer köylülere göre daha fazla çalışır, üretim kapasitesi yüksek.
+Karizmatik: Yüksek karizma statüsü; diğer köylülerle ve karşı cinsle etkileşimlerde avantaj sağlar.
+Sinirli: Diğer köylülerle etkileşimde daha agresif davranır, ilişki puanını düşürebilir.
+Uykucu: Gece olmadan uyumaya eğilimlidir, sabah geç kalkar.
+Yobaz: İnanç farklılıklarında ilişki puanını değiştirir; inananlara karşı olumlu, inanmayanlara karşı olumsuz etkiler.
+Babacan: Genç veya tecrübesiz köylülere rehberlik ederek deneyim kazandırır.
+Romantik: Sevgili ilişkilerinde hediye veya romantik davranışlarla ilişki puanını artırır.
+Merhametli: Diğer köylülere yardım etme eğilimindedir, olumlu sosyal etkileşim bonusu sağlar.
+Sabırlı: İşinde uzun süre kalıp bekleyebilir, ani karar değişikliklerinde hata oranı düşer.
+İnatçı: Kendi kararında ısrarcı; bazen takım çalışmasını zorlaştırsa da kararlı hareket eder.
+Esprili: Konuşmalarında moral ve etkileşim puanını artırır, sosyal atmosferi yumuşatır.
+Güvenilir: İlişkilerde güven puanını yükseltir, diğer köylülerin onunla iş yapmasını kolaylaştırır.
+Kurnaz: Ticaret ve ekonomik işlemlerde ekstra bonus sağlar, pazarlık gücünü artırır.
+Meraklı: Yeni bilgileri öğrenmeye açık, etkileşim fırsatlarını ve keşif şansını artırır.
+Dikkatli: İşlerinde hata yapma oranını düşürür, verimliliği artırır.
+Hırslı: Daha fazla altın kazanmak, ev sahibi olmak gibi hedeflere ulaşmada motive eder.
+Sabırsız: Hızlı sonuç bekler, bazen ani etkileşimlerde risk oluşturur.
+İyimser: Olumlu sosyal etkileşimlerde ekstra bonus sağlar, genel moral seviyesini yükseltir.
+Karamsar: Moral ve ilişki puanlarında olumsuz etki yapabilir, motivasyonu düşürebilir.
+Pratik: Sorunlara hızlı çözüm üretebilir, acil durumlarda avantaj sağlar.
+Mantıklı: Karar verirken duygusal tepkiler yerine mantığa öncelik verir, risk analizini iyileştirir.
+Duygusal: Hisleri yoğun, ani ilişki dalgalanmalarına sebep olabilir; olumlu/olumsuz etkiler yaratabilir.
+Soğukkanlı: Zorlu durumlarda panik yapmaz, soğukkanlılıkla hareket eder; kriz anlarında avantaj sağlar.
+Cömert: Ekonomik işlemlerde, hediye veya yardım potansiyelini artırır, sosyal ilişkilerde bonus sağlar.
+Kıskanç: İlişkilerde rekabeti artırır, olumsuz etki yaratma potansiyeli bulunur.
+Merhametsiz: Sosyal ilişkilerde ani düşüşlere sebep olabilir, güven puanını azaltır.
+İlgisiz: Sosyal etkileşimlere duyarsız kalır, ilişkilerin gelişimini engelleyebilir.
+Bu 28 özellik, köylüler arasında rastgele dağıtılacak; böylece her köylü, hem mesleki hem de sosyal etkileşimlerinde bu özelliklerin etkisi altında olacak.
+
+2. Detaylı Yapılacaklar Listesi ve Algoritma
+A. Temel Altyapı ve Grafik Düzenleme
+
+[A.1] Masaüstü Zemin ve Arka Plan Tasarımı:
+
+-Masaüstü widget için arka plan görseli ve zemin oluşturulması.
+-Arka plan ve zemin öğelerinin koordinat sistemine uygun yerleştirilmesi.
+
+[A.2] Sabit Grafik Elemanlarının Yerleştirilmesi:
+
+-Sol alt köşeye kale PNG dosyasının yerleştirilmesi.
+-Ağaç, ev gibi çevresel statik objelerin konumlandırılması.
+
+B. Köylü Karakterlerinin Oluşturulması
+
+[B.1] Başlangıç Karakterleri Üretimi:
+
+Adım 1: 6 köylü için rastgele cinsiyet ve isim belirle.
+Adım 2: Her köylüye meslek ataması yap (en az 1 Oduncu, en az 1 İnşaatçı, Avcı, Çiftci, en az 1 Gardiyan, 1 tane Papaz).
+Adım 3: Her köylüye 4 adet, 28 özellik havuzundan rastgele seçilmiş karakteristik özellik ataması yap.
+Adım 4: Her köylü için “eşinde aradığı özellikler” listesinden 2 özellik rastgele belirle.
+
+[B.2] Karakter İstatistiklerinin Tanımlanması:
+
+-Her köylü için meslek, altın, ilişki puanları ve diğer statüler (moral, sağlık, vb.) için başlangıç değerlerinin belirlenmesi.
+-Stat panellerinin arayüzde gösterilmesi (tıklama ile detay görüntüleme).
+
+C. Meslek ve Ekonomi Sistemlerinin Geliştirilmesi
+
+[C.1] Oduncu Mekaniği:
+
+Algoritma:
+-Köylü ağaç alanına yönlendirilir.
+-Ağaçlarla etkileşime girildiğinde, odun kesme animasyonu çalışır.
+-Kesilen her odun için köylüye belirli altın miktarı eklenir.
+-Detay: Hava durumu ve mevsimsel değişikliklere göre odun kesme verimliliği ayarlanabilir.
+
+[C.2] İnşaatçı Mekaniği:
+
+-Oduncudan gelen odun miktarına göre ev inşası başlatılır.
+-ev inşaa etmek için 20 oduna ihtiyaç var
+-bir ağaç kesildiğine 10 odun eklenir envantere(Bu envanter kalede bulunur. panele birde kale kısmı ekleyip kale içinde ne kadar envanter bulunuduğu gösterilir. Odun, Erzak vb.)
+-Yeterli odun olunca inşaatcı ev yapmaya başlar. ev yapımı 10 sn sürer
+-İnşaat sürecinde animasyon ve ilerleme göstergesi uygulanır.
+-Ev tamamlandığında, köylü ve ilgili paneller güncellenir.
+-Yapılan evin bir sahibi olmaz ilk başta. Evi satın alabilecek kadar parası olan bir köylü varsa o evi satın alır. Şimdilik 10 altın evin fiyatı normalde 100 yapıcaz.
+-evi satın alan köylü geceleri kaleye dönmek yerine evine döner.
+-İnşaatcı ev inşaa edince 100 altın kazanıyor.
+-Eğer evi satın alabilecek kadar parası olan 1 den fazla köylü varsa aralarından rastgele biri satın alır.
+-evler için assetlerdeki ev pnglerini kullan arakarından rastgele birini yapsın inşaatcı
+
+[C.3] Avcı ve Çiftçi Mekanikleri:
+
+-Avcı: Ormana gidip avlanır, avın başarısına göre yemek/altın ödülü kazanır.
+-Çiftçi: Tarım alanında ürün yetiştirir; mevsimsel değişiklik ve hava durumu etkisi eklenir.
+-Ürün ve av kalitesi, köylünün özelliklerine (Çalışkan, Dikkatli, vs.) göre modifiye edilir.
+-Ticaret sistemi köylüler arası
+
+[C.4] Gardiyan ve Papaz Mekanikleri:
+
+-Gardiyan: Huzursuzluk yaratan veya olumsuz davranış sergileyen köylüleri tespit edip “hapishane” mekanizması başlatır.
+-Papaz: Evlilik sürecinde çiftleri kiliseye yönlendirir, ahlaki yargı mekanizması (aldatma, ihanet durumunda) uygular.
+
+[C.5] Ekonomi ve Altın Yönetimi:
+
+-Her meslek için gelir hesaplaması, harcamalar ve ev satın alma mekanizmasının oluşturulması.
+-Altın birikimine göre ekstra özellikler (hediye alma, yatırım) tanımlanır.
+
+D. Sosyal İlişki ve Etkileşim Mekanikleri
+
+[D.1] İlişki Puanlama Sistemi Kurulması:
+
+-Her köylü için diğer köylülerle olan ilişki puanları (0–100 arası) başlangıçta rastgele veya sabit değerle başlatılır.
+-Panel arayüzüyle bu değerlerin canlı güncellenmesi sağlanır.
+
+[D.2] Etkileşim Algoritması:
+
+Algoritma Adımları:
+
+-İki köylü rastlantısal olarak karşılaştığında, sahip oldukları özelliklere göre etkileşim puanı hesaplanır.
+-Örneğin; Karizmatik ve Esprili özellikler, pozitif etkileşim şansını artırır; Sinirli veya Kıskanç özellikler ise puanı düşürebilir.
+-Her etkileşimde ilişki puanı artışı veya düşüşü, belirlenen eşik değerler doğrultusunda güncellenir.
+
+İlişki Aşamaları:
+
+-3 pozitif etkileşim sonucu “Dost” statüsüne ulaşılması.
+-Dost olan karşı cins için, “eşinde aradığı özellikler” kontrolü yapılır:
+-Karşı köylü listede belirtilen 2 özellikten birine sahipse, Sevgili olma ihtimali +%30.
+-Her iki özellik de mevcutsa, ihtimal +%40.
+-Hiçbir özellik bulunmazsa, ihtimal +%10.
+-Sevgili aşamasının ardından, evlilik için ek şartlar (ev sahibi olma, toplam 500 altın, kilise ziyareti) kontrol edilir; evlilik gerçekleşirse ilişki puanı otomatik 100 olarak ayarlanır.
+
+[D.3] İlişki Paneli ve Geribildirim Arayüzü:
+
+-Her köylünün, diğerleriyle olan ilişki durumunu (dostluk, sevgi, öfke vb.) gösteren panel oluşturulur.
+-Tıklanıldığında detaylı istatistik ve geçmiş etkileşim raporu sunulur.
+
+[D.4] Zaman İle İlişki Dinamikleri:
+
+Aşama: Evliler arasında zamanla ilgi azalması (yavaşça düşen ilişki puanı).
+Koşul: İlgi puanı 50’nin altına düştüğünde, köydeki diğer bekar köylülerden biri gizli aldatma girişiminde bulunabilir.
+Sonuç: Aldatma fark edilirse, ahlaki sistem (örneğin: sosyal ceza, güven puanında düşüş) devreye girer.
+
+E. Gün/Gece Döngüsü ve Hareket Algoritması
+
+[E.1] Gün Döngüsü:
+
+Algoritma:
+
+-Belirli zaman dilimleri (saat dilimleri gibi) tanımlanır.
+-Her dilimde köylüler mesleklerine uygun alanlara (orman, tarım, inşaat) yönlendirilir.
+-Rastgele etkileşim olayları (konuşma, görev başlatma vb.) tetiklenir.
+-Ek: Hava durumu ve mevsimsel değişiklikler de iş performansını etkiler.
+
+[E.2] Gece Döngüsü:
+
+-Tüm köylüler, ev sahibi olup olmadıklarına göre kaleye veya evlerine yönlendirilir.
+-Ev sahibi olmayan köylüler için gece konaklama animasyonları uygulanır.
+-Gece modunda belirli “dinlenme” ve “yenilenme” mekanizmaları devreye girer.
+
+F. Ekstra Dinamik ve Gelişmiş Sistemlerin Entegrasyonu
+
+[F.1] Hava Durumu ve Mevsimsel Değişiklikler:
+
+-Hava durumu (yağmur, kar, sis) ve mevsimlere göre meslek performansının modifiye edilmesi.
+-Örneğin; yağmurlu havalarda inşaat yavaşlayabilir, kışın odun kesme verimliliği artabilir.
+
+[F.2] Festival, Etkinlik ve Görev Sistemleri:
+
+-Belirli günlerde köylülerin moral ve ilişki bonusları sağlayacak festival, etkinlik günleri planlanır.
+-Bireysel ve takım görevleri oluşturulur; görev tamamlandığında ödüller (altın, özel eşyalar) dağıtılır.
+
+[F.3] Hastalık, Sağlık ve Eğitim Mekanizmaları:
+
+-Köylülerin zaman zaman hastalanması için rastgele olaylar eklenir, tedavi için sağlık sistemi devreye girer.
+-Eğitim mekanizması ile deneyim puanları kazanıp, yeni beceriler öğrenmeleri sağlanır.
+
+[F.4] Ticaret, Yatırım ve Yapı İnşası:
+
+-Köy içi alışveriş ve komşu kasaba ile ticaret sistemi entegre edilir.
+-Altın, belirli projelere (kaleyi güçlendirme, savunma sistemleri vb.) yönlendirilir.
+-Ek yapılar (atölye, pazar, mezarlık) inşa edilebilir.
+
+[F.5] İç Politika, Rehberlik ve Sosyal Skandallar:
+
+-Köy içi seçim, oylama ve liderlik sistemi uygulanır.
+-Babacan köylülerin gençlere mentorluk yapması, sosyal deneyimin artması sağlanır.
+-İlişkilerde veya görevlerde yaşanan başarısızlık ve ihlaller, dinamik sosyal skandallar ve ahlaki cezalara yol açar.
+
+G. Test, Düzeltme ve Son Rötuşlar
+
+[G.1] Modül Testleri:
+
+-Her bir modül (grafik, AI, ekonomi, ilişki sistemi) için senaryo bazlı testler yapılır.
+-Hata raporları oluşturularak düzeltmeler uygulanır.
+
+[G.2] Entegrasyon Testleri:
+
+-Tüm sistemlerin birlikte çalışma senaryoları test edilir.
+-Gerçek zamanlı etkileşimlerde simülasyonun stabilitesi kontrol edilir.
+
+[G.3] Kullanıcı Arayüzü ve Görsel İyileştirmeler:
+
+-İstatistik panelleri, animasyon geçişleri ve geribildirimlerin son düzenlemeleri yapılır.
+-Oyun içi ses efektleri ve müzik entegrasyonu tamamlanır.
