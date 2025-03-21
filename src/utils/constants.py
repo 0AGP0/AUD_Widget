@@ -2,15 +2,66 @@
 
 # Köylü isimleri
 MALE_NAMES = [
-    "Alp", "Kağan", "Timur", "Oğuz", "Batur", "Korkut", "Orhan", "Turgut",
-    "Aybars", "Börü", "Çağrı", "Demirhan", "Ertuğrul", "Gökhan", "Han",
-    "İlbey", "Kılıç", "Mete", "Noyan", "Olcay", "Özbek", "Pars", "Sungur"
+    "William",
+    "Richard",
+    "Henry",
+    "Geoffrey",
+    "Robert",
+    "Edmund",
+    "Thomas",
+    "Simon",
+    "Alfred",
+    "Frederick",
+    "Otto",
+    "Roderick",
+    "Baldwin",
+    "Charles",
+    "Hugh",
+    "Gerard",
+    "Philip",
+    "Ambrose",
+    "Giles",
+    "Walter",
+    "Roger",
+    "Edgar",
+    "Cedric",
+    "Ulric",
+    "Miles",
+    "Edwin",
+    "Markus",
+    "Julian",
+    "Vincent"
 ]
 
 FEMALE_NAMES = [
-    "Ayça", "Bilge", "Ceren", "Dilara", "Esin", "Gökçe", "Handan",
-    "İlkay", "Jale", "Kübra", "Leyla", "Meltem", "Naz", "Özge",
-    "Pınar", "Rüya", "Seda", "Tuğçe", "Ülkü", "Yağmur", "Zeynep"
+    "Eleanor",
+    "Matilda",
+    "Isabella",
+    "Alice",
+    "Beatrice",
+    "Adelaide",
+    "Joan",
+    "Margaret",
+    "Agnes",
+    "Elizabeth",
+    "Mary",
+    "Philippa",
+    "Rosamund",
+    "Aveline",
+    "Constance",
+    "Cecily",
+    "Helena",
+    "Louisa",
+    "Irene",
+    "Beatrix",
+    "Clarissa",
+    "Diana",
+    "Felicity",
+    "Gwendolyn",
+    "Veronica",
+    "Sybilla",
+    "Olivia",
+    "Emmeline"
 ]
 
 # Meslekler

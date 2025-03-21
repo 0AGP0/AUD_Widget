@@ -414,7 +414,10 @@ def find_nearby_villager(villager):
     """Yakındaki başka bir köylüyü bulur"""
     try:
         if not hasattr(villager, 'game_controller') or not villager.game_controller:
+            print(f"UYARI: {villager.name} için game_controller bulunamadı!")
             return None
+        
+        print(f"DEBUG: {villager.name} yakındaki köylü arıyor...")
         
         # Tüm köylüleri kontrol et
         for other in villager.game_controller.villagers:
@@ -422,11 +425,13 @@ def find_nearby_villager(villager):
             if other != villager:
                 # Mesafeyi hesapla
                 distance = ((villager.x - other.x) ** 2 + (villager.y - other.y) ** 2) ** 0.5
-                if distance < 50:  # 50 birim mesafe içinde (daha kısa mesafe)
+                if distance < 80:  # Mesafeyi artır - 80 birim mesafe içinde
+                    print(f"DEBUG: {villager.name} ve {other.name} arası mesafe: {distance}")
                     # Köylü sohbet etmiyor olmalı - diğer köylüler ile konuşmamayı garantile
                     if not hasattr(other, 'is_chatting') or not other.is_chatting:
                         # Köylünün başka bir sohbeti yoksa
                         if not hasattr(other, 'chat_partner') or other.chat_partner is None:
+                            print(f"BULUNDU: {villager.name}, {other.name} ile konuşabilir!")
                             return other
         
         return None
@@ -456,17 +461,18 @@ def start_chat_with_nearby_villager(villager):
         nearby_villager = find_nearby_villager(villager)
         
         if not nearby_villager:
-            # print(f"{villager.name} yakınında sohbet edecek köylü bulamadı.")
+            print(f"{villager.name} yakınında sohbet edecek köylü bulamadı.")
             return NodeStatus.FAILURE
         
         # Diğer köylünün de cooldown süresi kontrol edilir
         if hasattr(nearby_villager, 'chat_cooldown') and current_time < nearby_villager.chat_cooldown:
             # Diğer köylünün cooldown süresi dolmamış
+            print(f"{nearby_villager.name}'nin konuşma cooldown süresi dolmamış.")
             return NodeStatus.FAILURE
         
         # Diğer köylü zaten sohbet ediyorsa atla - çift kontrol
         if hasattr(nearby_villager, 'is_chatting') and nearby_villager.is_chatting:
-            # print(f"{nearby_villager.name} zaten başka biriyle konuşuyor.")
+            print(f"{nearby_villager.name} zaten başka biriyle konuşuyor.")
             return NodeStatus.FAILURE
             
         # Köylünün kendisi de sohbet etmiyorsa - çift kontrol
@@ -474,15 +480,17 @@ def start_chat_with_nearby_villager(villager):
             return NodeStatus.FAILURE
         
         # Köylüler arasında ilişki kontrolü (eğer sevilmiyorsa konuşma şansı düşük)
-        if dialogue_manager and hasattr(villager, 'relationships') and villager.name in nearby_villager.relationships:
-            relationship = nearby_villager.relationships[villager.name]
+        if dialogue_manager and hasattr(villager, 'relationships') and nearby_villager.name in villager.relationships:
+            relationship = villager.relationships[nearby_villager.name]
             # Düşük ilişki düzeyinde konuşma olasılığı azalır
             if relationship == "Düşman" and random.random() < 0.9:  # %90 ihtimalle konuşma yok
-                print(f"{nearby_villager.name}, {villager.name} ile konuşmak istemiyor (düşman).")
+                print(f"{villager.name}, {nearby_villager.name} ile konuşmak istemiyor (düşman).")
                 return NodeStatus.FAILURE
             elif relationship == "Antipatik" and random.random() < 0.7:  # %70 ihtimalle konuşma yok
-                print(f"{nearby_villager.name}, {villager.name} ile konuşmak istemiyor (antipatik).")
+                print(f"{villager.name}, {nearby_villager.name} ile konuşmak istemiyor (antipatik).")
                 return NodeStatus.FAILURE
+        
+        print(f"BAŞLATILIYOR: {villager.name} ve {nearby_villager.name} arasında sohbet başlatılıyor!")
         
         # Sohbeti başlat
         if start_chat(villager, nearby_villager):
@@ -496,6 +504,16 @@ def start_chat_with_nearby_villager(villager):
         print(f"Sohbet başlatma hatası: {str(e)}")
         import traceback
         traceback.print_exc()
+        # Hata durumunda köylüleri serbest bırak
+        try:
+            villager.moving = True
+            if hasattr(villager, 'chat_partner'):
+                villager.chat_partner.moving = True
+            villager.is_wandering = True
+            if hasattr(villager, 'chat_partner'):
+                villager.chat_partner.is_wandering = True
+        except:
+            pass
         return NodeStatus.FAILURE
 
 def check_if_near_chat_partner(villager):
@@ -527,6 +545,8 @@ def approach_chat_partner(villager, target_villager):
         
         # Eğer yeteri kadar yakınsa durup konuşmaya başla
         if distance <= CONVERSATION_DISTANCE:
+            print(f"YAKLAŞMA: {villager.name} ve {target_villager.name} konuşma mesafesinde ({distance:.1f})")
+            
             # Her iki köylüyü de durdur
             if hasattr(villager, 'moving'):
                 villager.moving = False
@@ -539,13 +559,15 @@ def approach_chat_partner(villager, target_villager):
             if hasattr(target_villager, 'is_wandering'):
                 target_villager.is_wandering = False
                 
-            # Hızları sıfırla
+            # Hızları sıfırla ve orijinal hızları sakla
             if hasattr(villager, 'speed'):
-                villager._original_speed = villager.speed
+                if not hasattr(villager, '_original_speed'):
+                    villager._original_speed = villager.speed
                 villager.speed = 0
                 
             if hasattr(target_villager, 'speed'):
-                target_villager._original_speed = target_villager.speed
+                if not hasattr(target_villager, '_original_speed'):
+                    target_villager._original_speed = target_villager.speed
                 target_villager.speed = 0
             
             # Hareket vektörlerini sıfırla
@@ -556,7 +578,7 @@ def approach_chat_partner(villager, target_villager):
                 target_villager.vx = 0
                 target_villager.vy = 0
             
-            # Birbirlerine baksınlar
+            # Birbirlerine baksınlar - yönlerini ayarla
             if hasattr(villager, 'direction'):
                 villager.direction = calculate_direction(villager.x, villager.y, target_villager.x, target_villager.y)
             
@@ -570,7 +592,7 @@ def approach_chat_partner(villager, target_villager):
             if hasattr(target_villager, 'direction_x'):
                 target_villager.direction_x = 1 if target_villager.x < villager.x else -1
             
-            print(f"{villager.name} ve {target_villager.name} konuşma için tamamen durdular")
+            print(f"DURUŞ: {villager.name} ve {target_villager.name} tamamen durdular ve birbirlerine bakıyorlar")
             
             # Konuşma başlat
             if start_chat(villager, target_villager):
@@ -580,11 +602,29 @@ def approach_chat_partner(villager, target_villager):
                     target_villager.state = CHATTING
                 return NodeStatus.SUCCESS
             else:
+                # Konuşma başlatılamazsa köylüleri serbest bırak
+                print(f"HATA: Konuşma başlatılamadı, köylüler serbest bırakılıyor")
+                villager.moving = True
+                target_villager.moving = True
+                villager.is_wandering = True
+                target_villager.is_wandering = True
+                villager.speed = villager._original_speed if hasattr(villager, '_original_speed') else 0.35
+                target_villager.speed = target_villager._original_speed if hasattr(target_villager, '_original_speed') else 0.35
                 return NodeStatus.FAILURE
         else:
+            # Yaklaşma mesafesini göster
+            if hasattr(villager, 'last_approach_log_time'):
+                log_interval = 1.0  # 1 saniyede bir log göster
+                current_time = time.time()
+                if current_time - villager.last_approach_log_time >= log_interval:
+                    print(f"YAKLAŞIYOR: {villager.name} -> {target_villager.name} mesafe: {distance:.1f}, hedef mesafe: {CONVERSATION_DISTANCE}")
+                    villager.last_approach_log_time = current_time
+            else:
+                villager.last_approach_log_time = time.time()
+                
             # Hala yaklaşıyor, hareket etmeye devam et
             if hasattr(villager, 'move_towards'):
-                villager.move_towards(target_villager.x)
+                villager.move_towards(target_villager.x, target_villager.y)  # Hedefin x,y koordinatlarına doğru hareket et
                 villager.state = APPROACHING
                 return NodeStatus.RUNNING
             else:
@@ -593,22 +633,40 @@ def approach_chat_partner(villager, target_villager):
                 if distance > 0:
                     normalize_factor = 1.0 / distance
                 
+                # Hedefe doğru vektörü ayarla ve hızını normalize et
                 if hasattr(villager, 'vx'):
-                    villager.vx = dx * normalize_factor * villager.speed
-                    villager.vy = dy * normalize_factor * villager.speed
+                    # Hareket hızı
+                    movement_speed = villager.speed if hasattr(villager, 'speed') else 0.5
+                    
+                    # Hareket vektörünü hesapla
+                    villager.vx = dx * normalize_factor * movement_speed
+                    villager.vy = dy * normalize_factor * movement_speed
                 
+                # Hareket bayrağını ayarla
                 if hasattr(villager, 'moving'):
                     villager.moving = True
                 
+                # Villager'ın yönünü hedefe çevir
                 if hasattr(villager, 'direction'):
                     villager.direction = calculate_direction(villager.x, villager.y, target_villager.x, target_villager.y)
                 
+                # Durumu güncelle
                 villager.state = APPROACHING
                 return NodeStatus.RUNNING
     except Exception as e:
         print(f"Köylü yaklaşma hatası: {str(e)}")
         import traceback
         traceback.print_exc()
+        # Hata durumunda köylüleri serbest bırak
+        try:
+            villager.moving = True
+            target_villager.moving = True
+            villager.is_wandering = True
+            target_villager.is_wandering = True
+            villager.speed = villager._original_speed if hasattr(villager, '_original_speed') else 0.35
+            target_villager.speed = target_villager._original_speed if hasattr(target_villager, '_original_speed') else 0.35
+        except:
+            pass
         return NodeStatus.FAILURE
 
 def calculate_direction(x1, y1, x2, y2):
@@ -621,6 +679,95 @@ def calculate_direction(x1, y1, x2, y2):
     else:
         return "south" if dy > 0 else "north"
 
+def start_chat(villager, target_villager):
+    """İki köylü arasında sohbet başlatır"""
+    try:
+        # Hedef köylü geçersizse başarısız
+        if not target_villager:
+            return False
+            
+        print(f"CHAT BAŞLATILIYOR: {villager.name} ve {target_villager.name} arasında sohbet...")
+            
+        # Her iki köylünün de konuşma durumunu güncelle
+        villager.is_chatting = True
+        target_villager.is_chatting = True
+        
+        # Chat partnerları ayarla
+        villager.chat_partner = target_villager
+        target_villager.chat_partner = villager
+        
+        # Sohbet süresini ayarla (10-30 saniye arası)
+        chat_duration = random.uniform(10, 30)
+        end_time = time.time() + chat_duration
+        
+        villager.chat_end_time = end_time
+        target_villager.chat_end_time = end_time
+        
+        # Sonraki chat için cooldown ayarla (30-120 saniye)
+        cooldown_duration = random.uniform(30, 120)
+        cooldown_end_time = end_time + cooldown_duration
+        
+        villager.chat_cooldown = cooldown_end_time
+        target_villager.chat_cooldown = cooldown_end_time
+        
+        # Son konuşma mesaj zamanını sıfırla
+        villager.last_chat_message_time = time.time()
+        target_villager.last_chat_message_time = time.time()
+        
+        # Sohbet durumunu güncelle
+        villager.state = CHATTING
+        target_villager.state = CHATTING
+        
+        # Köylülerin aktif diyalog baloncuklarını temizle
+        clear_all_dialogue_bubbles(villager)
+        clear_all_dialogue_bubbles(target_villager)
+        
+        # Soru-cevap mekanizması için bayraklar
+        villager.last_message_was_question = False
+        target_villager.last_message_was_question = False
+        
+        # Diyalog konusunu sıfırla
+        if hasattr(villager, 'last_topic'):
+            delattr(villager, 'last_topic')
+            
+        if hasattr(target_villager, 'last_topic'):
+            delattr(target_villager, 'last_topic')
+            
+        # Konuşma sayacı - sohbet ilerlemesini takip etmek için
+        villager.conversation_counter = 0
+        target_villager.conversation_counter = 0
+        
+        # Son konuşan kişiyi sıfırla
+        villager.last_speaker = None
+        target_villager.last_speaker = None
+        
+        # Selamlaşma mesajı ile başla
+        if dialogue_manager:
+            greeting = dialogue_manager.generate_greeting(villager, target_villager)
+            
+            # Diyalog baloncuğunu göster
+            if hasattr(villager, 'game_controller') and villager.game_controller:
+                bubble = villager.game_controller.create_dialogue_bubble(villager, greeting)
+                
+                # Baloncuğu geri döndürdüğünden emin ol
+                if bubble:
+                    # Baloncuğu takip etmek için kaydet
+                    villager.current_bubble = bubble
+                    villager.active_bubble = True
+                    villager.bubble_start_time = time.time()
+                    
+                    print(f"{villager.name}'nin selamlaşma baloncuğu gösterildi")
+            
+            # Diyaloğu kaydet
+            dialogue_manager.log_dialogue(villager, target_villager, greeting)
+        
+        return True
+    except Exception as e:
+        print(f"Sohbet başlatma hatası: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def continue_chatting(villager, target_villager):
     """Köylülerin sohbet etmeye devam etmesini sağlar"""
     try:
@@ -631,7 +778,7 @@ def continue_chatting(villager, target_villager):
                 end_chat(villager, None)
             return NodeStatus.FAILURE
             
-        # Her iki köylüyü de sabit tut ve konuşma mesafesini kontrol et
+        # İki köylü arasındaki mesafeyi kontrol et
         dx = target_villager.x - villager.x
         dy = target_villager.y - villager.y
         distance = (dx**2 + dy**2)**0.5
@@ -670,47 +817,50 @@ def continue_chatting(villager, target_villager):
             target_villager.vx = 0
             target_villager.vy = 0
         
-        # Birbirlerine bakmalarını sağla
-        if hasattr(villager, 'direction'):
-            villager.direction = calculate_direction(villager.x, villager.y, target_villager.x, target_villager.y)
-        if hasattr(target_villager, 'direction'):
-            target_villager.direction = calculate_direction(target_villager.x, target_villager.y, villager.x, villager.y)
-            
-        # Yön vektörlerini ayarla (eski stil)
-        if hasattr(villager, 'direction_x'):
-            villager.direction_x = 1 if villager.x < target_villager.x else -1
-        if hasattr(target_villager, 'direction_x'):
-            target_villager.direction_x = 1 if target_villager.x < villager.x else -1
-        
-        # Konuşma durumunu kontrol et
+        # Şu anki zamanı al
         current_time = time.time()
         
-        # Aktif balonları zorla temizle (biri baloncuğunu kaybettiyse 5 saniye geçmişse)
+        # Baloncuk sistemini kontrol et - eğer baloncuk görünme süresi dolduysa kaldır
+        # Not: QTimer'ın yerine zamanlama sistemini düzgün bir şekilde kontrol ediyoruz
         if hasattr(villager, 'active_bubble') and villager.active_bubble:
-            if hasattr(villager, 'bubble_start_time') and current_time - villager.bubble_start_time > 5:
-                force_clear_bubble(villager)
-                
+            if hasattr(villager, 'bubble_start_time') and villager.current_bubble:
+                bubble_duration = current_time - villager.bubble_start_time
+                if bubble_duration >= 3:  # 3 saniye geçtiyse baloncuğu sil
+                    print(f"{villager.name}'nin baloncuğu 3 saniye doldu, siliniyor...")
+                    force_remove_bubble(villager, villager.current_bubble)
+                    
         if hasattr(target_villager, 'active_bubble') and target_villager.active_bubble:
-            if hasattr(target_villager, 'bubble_start_time') and current_time - target_villager.bubble_start_time > 5:
-                force_clear_bubble(target_villager)
-                
+            if hasattr(target_villager, 'bubble_start_time') and target_villager.current_bubble:
+                bubble_duration = current_time - target_villager.bubble_start_time
+                if bubble_duration >= 3:  # 3 saniye geçtiyse baloncuğu sil
+                    print(f"{target_villager.name}'nin baloncuğu 3 saniye doldu, siliniyor...")
+                    force_remove_bubble(target_villager, target_villager.current_bubble)
+        
         # Aktif konuşma balonu var mı kontrol et (şu anda konuşan var mı?)
+        # Eğer herhangi bir baloncuk hala aktifse, yeni konuşma başlatma
         if hasattr(villager, 'active_bubble') and villager.active_bubble:
-            # Konuşma sırasını değiştirme, baloncuk hala gösteriliyor
             return NodeStatus.RUNNING
             
         if hasattr(target_villager, 'active_bubble') and target_villager.active_bubble:
-            # Konuşma sırasını değiştirme, baloncuk hala gösteriliyor
             return NodeStatus.RUNNING
         
         # Konuşma zamanı kontrolü
         if not hasattr(villager, 'last_chat_message_time'):
             villager.last_chat_message_time = 0
             
-        # Konuşma zamanını kontrol et - son mesajdan sonra 3-7 saniye geçmiş mi?
-        if current_time - villager.last_chat_message_time >= random.uniform(3, 7):
+        # Konuşma zamanını kontrol et - son mesajdan sonra belirli bir zaman geçmiş mi?
+        message_time_passed = current_time - villager.last_chat_message_time
+        
+        # Konuşma arası bekleme süresini, konuşmanın ilerleme durumuna göre ayarla
+        if not hasattr(villager, 'conversation_counter'):
+            villager.conversation_counter = 0
+        
+        # Konuşmanın ilk kısmı hızlı, sonrası daha yavaş olsun
+        wait_time = 3.0 if villager.conversation_counter < 2 else random.uniform(4, 8)
+        
+        if message_time_passed >= wait_time:
             # Diyalog balonunun görünür kalma süresi (konuşma içeriğine bağlı)
-            message_display_time = 3000  # 3 saniye (ms)
+            message_display_time = 3  # 3 saniye
             
             # ÖNEMLİ: Soru-cevap dinamiğini kontrol et
             # Soru sorulduğunda cevaplama mekanizması çalışmazsa konuşmalar kilitlenebilir
@@ -737,6 +887,16 @@ def continue_chatting(villager, target_villager):
                         "Biraz yorgunum ama iyiyim."
                     ]
                     
+                    # Son soruyu karşı tarafın last_dialogue'una ayarla
+                    if hasattr(villager, 'last_question_text') and villager.last_question_text:
+                        # Son soruyu al
+                        target_villager.last_dialogue = villager.last_question_text
+                        print(f"Son soru hedef köylüye atandı: {target_villager.last_dialogue}")
+                    else:
+                        # Soru yoksa varsayılan soru ata
+                        target_villager.last_dialogue = "Günün nasıl geçiyor?"
+                        print(f"Varsayılan soru kullanılıyor: {target_villager.last_dialogue}")
+                    
                     # Diyalog yöneticisinden cevap almaya çalış
                     try:
                         # Cevap üret
@@ -749,9 +909,31 @@ def continue_chatting(villager, target_villager):
                     
                     print(f"CEVAP: {target_villager.name} -> {villager.name}: {response}")
                     
+                    # Son cevapları takip et - tekrarı önle
+                    if not hasattr(target_villager, 'last_responses'):
+                        target_villager.last_responses = []
+                        
+                    # Son 5 cevabı kontrol et, tekrar olmamasını sağla
+                    while response in target_villager.last_responses and len(target_villager.last_responses) > 0:
+                        # Farklı bir cevap bul
+                        response = dialogue_manager.generate_response(villager, target_villager)
+                        if not response or response in target_villager.last_responses:
+                            # Yeni bir cevap bulunamadıysa default'lardan al
+                            filtered_defaults = [r for r in default_responses if r not in target_villager.last_responses]
+                            if filtered_defaults:
+                                response = random.choice(filtered_defaults)
+                            else:
+                                response = random.choice(default_responses)
+                                break  # Son çare olarak
+
+                    # Cevabı son cevaplar listesine ekle
+                    target_villager.last_responses.append(response)
+                    if len(target_villager.last_responses) > 5:
+                        target_villager.last_responses.pop(0)
+                    
                     # Uzun yanıtlar için daha uzun görünme süresi
                     if len(response) > 50:
-                        message_display_time = 5000  # 5 saniye
+                        message_display_time = 5  # 5 saniye
                     
                     # Aktif baloncuk kaydı - baloncuğun yok edilmesini takip etmek için
                     target_villager.active_bubble = True
@@ -766,10 +948,9 @@ def continue_chatting(villager, target_villager):
                             # Baloncuğun kaldırılması - baloncuk referansını koru
                             target_villager.current_bubble = bubble
                             
-                            # Baloncuk zamanlamasının doğru çalıştığından emin olmak için
-                            # QTimer yerine basit zaman kontrolü ile temizleyebiliriz
-                            # Ancak QTimer kullanırsak lambda kapanım sorununu çözmek için özel parametre geçiyoruz
-                            QTimer.singleShot(message_display_time, lambda v=target_villager, b=bubble: force_remove_bubble(v, b))
+                            # QTimer artık kullanmıyoruz, bunun yerine bubble_start_time kullanıyoruz
+                            # ve her framedeki kontrol sistemi baloncukları yönetiyor
+                            print(f"{target_villager.name}'nin baloncuğu gösterildi, {message_display_time} saniye sonra silinecek")
                         else:
                             # Baloncuk oluşturulamadıysa aktif bayrak temizle
                             target_villager.active_bubble = False
@@ -784,69 +965,105 @@ def continue_chatting(villager, target_villager):
                     villager.last_message_was_question = False
                     if hasattr(target_villager, 'last_message_was_question'):
                         target_villager.last_message_was_question = False
+                        
+                    # Konuşma sayacını artır
+                    villager.conversation_counter += 1
                 else:
                     # Diyalog yöneticisi yoksa soruyu zorla sıfırla - kilitleme sorunu çözümü
                     print("Diyalog yöneticisi bulunamadı, soru bayrağı sıfırlanıyor")
                     villager.last_message_was_question = False
             else:
-                # Normal diyaloğa devam et (konuşma şansı azaltılmış)
-                if random.random() < 0.6:  # %60 konuşma şansı
-                    # Rastgele konuşmacı seç
-                    speaker = villager if random.random() < 0.5 else target_villager
+                # Normal diyaloğa devam et
+                # 15'ten fazla replik söylendiyse konuşmayı bitirelim
+                if hasattr(villager, 'conversation_counter') and villager.conversation_counter >= 15:
+                    print(f"Yeterince konuşuldu ({villager.conversation_counter} replik), konuşma sonlandırılıyor.")
+                    end_chat(villager, target_villager)
+                    return NodeStatus.SUCCESS
+                
+                if random.random() < 0.85:  # %85 konuşma şansı - daha sık konuşsunlar
+                    # Konuşan kişi olarak sırayı alacak kişiyi belirle 
+                    # Sıralı konuşmayı garanti et, son konuşandan sonra diğeri konuşsun
+                    if hasattr(villager, 'last_speaker') and villager.last_speaker == villager.name:
+                        speaker = target_villager
+                    else:
+                        speaker = villager
+                        
                     listener = target_villager if speaker == villager else villager
                     
-                    # Rastgele bir konu seç - önceki konuyla ilişkili olasılığı artırıldı
-                    if dialogue_manager:
-                        # Eğer önceki konu hatırlanıyorsa belli bir olasılıkla aynı konuyu devam ettir
-                        if hasattr(villager, 'last_topic') and random.random() < 0.7:
-                            topic = villager.last_topic
-                        else:
-                            topic = random.choice(dialogue_manager.TOPICS)
-                            villager.last_topic = topic
+                    # Son konuşan kişiyi kaydet
+                    villager.last_speaker = speaker.name
+                    
+                    # Rastgele bir konu seçme olasılığı
+                    if not hasattr(villager, 'conversation_topic') or random.random() < 0.4:
+                        topic = random.choice(dialogue_manager.TOPICS)
+                        villager.conversation_topic = topic
+                    else:
+                        # Mevcut konuya devam et
+                        topic = villager.conversation_topic
+                    
+                    # Diyalog satırı üret
+                    message = dialogue_manager.generate_dialogue_line(speaker, listener, topic)
+                    
+                    # Uzun mesajlar için daha uzun görünme süresi
+                    if len(message) > 50:
+                        message_display_time = 5  # 5 saniye
+                    
+                    # Soru mu kontrolü (daha sık soru sorulsun %40)
+                    is_question = "?" in message or random.random() < 0.3
+                    speaker.last_message_was_question = is_question
+                    
+                    # Eğer mesaj soru içermiyorsa ve soru olarak işaretlendiyse, soru eki ekle
+                    if is_question and "?" not in message:
+                        # Rastgele soru ekle
+                        question_suffixes = [
+                            ", değil mi?", 
+                            ", sence de öyle mi?", 
+                            ", sen ne düşünüyorsun?", 
+                            ", senin fikrin nedir?",
+                            "... Peki senin durumun nasıl?"
+                        ]
+                        message += random.choice(question_suffixes)
+                        print(f"SORU EKLENDİ: {message}")
+                    
+                    if is_question:
+                        print(f"YENİ SORU: {speaker.name} -> {listener.name}: '{message}'")
+                        # Soruyu sakla - cevap vermek için kullanılacak
+                        speaker.last_question_text = message
+                    
+                    # Aktif baloncuk kaydı
+                    speaker.active_bubble = True
+                    speaker.bubble_start_time = current_time
+                    
+                    # Diyalog baloncuğunu göster
+                    if hasattr(speaker, 'game_controller') and speaker.game_controller:
+                        bubble = speaker.game_controller.create_dialogue_bubble(speaker, message)
                         
-                        message = dialogue_manager.generate_dialogue_line(speaker, listener, topic)
-                        
-                        # Uzun mesajlar için daha uzun görünme süresi
-                        if len(message) > 50:
-                            message_display_time = 5000  # 5 saniye
-                        
-                        # Soru mu kontrolü
-                        is_question = "?" in message
-                        speaker.last_message_was_question = is_question
-                        
-                        if is_question:
-                            print(f"YENİ SORU: {speaker.name} -> {listener.name}: '{message}'")
-                        
-                        # Aktif baloncuk kaydı
-                        speaker.active_bubble = True
-                        speaker.bubble_start_time = current_time
-                        
-                        # Diyalog baloncuğunu göster
-                        if hasattr(speaker, 'game_controller') and speaker.game_controller:
-                            bubble = speaker.game_controller.create_dialogue_bubble(speaker, message)
+                        # Baloncuğu geri döndürdüğünden emin ol
+                        if bubble:
+                            # Baloncuğun kaldırılması - baloncuk referansını koru
+                            speaker.current_bubble = bubble
                             
-                            # Baloncuğu geri döndürdüğünden emin ol
-                            if bubble:
-                                # Baloncuğun kaldırılması - baloncuk referansını koru
-                                speaker.current_bubble = bubble
-                                
-                                # Baloncuk zamanlamasının doğru çalıştığından emin olmak için
-                                QTimer.singleShot(message_display_time, lambda v=speaker, b=bubble: force_remove_bubble(v, b))
-                            else:
-                                # Baloncuk oluşturulamadıysa aktif bayrak temizle
-                                speaker.active_bubble = False
+                            # QTimer artık kullanmıyoruz, bunun yerine bubble_start_time kullanıyoruz
+                            # ve her framedeki kontrol sistemi baloncukları yönetiyor
+                            print(f"{speaker.name}'nin baloncuğu gösterildi, {message_display_time} saniye sonra silinecek")
                         else:
-                            # Game controller yok veya bubble oluşturulamadı
+                            # Baloncuk oluşturulamadıysa aktif bayrak temizle
                             speaker.active_bubble = False
+                    else:
+                        # Game controller yok veya bubble oluşturulamadı
+                        speaker.active_bubble = False
+                    
+                    # Diyaloğu kaydet
+                    dialogue_manager.log_dialogue(speaker, listener, message)
+                    
+                    print(f"{speaker.name} -> {listener.name}: {message}")
+                    
+                    # İki köylü arasındaki ilişkiyi güncelle (her 3 mesajda bir)
+                    if random.random() < 0.3:
+                        dialogue_manager.update_relationship(speaker, listener)
                         
-                        # Diyaloğu kaydet
-                        dialogue_manager.log_dialogue(speaker, listener, message)
-                        
-                        print(f"{speaker.name} -> {listener.name}: {message}")
-                        
-                        # İki köylü arasındaki ilişkiyi güncelle (her 3 mesajda bir)
-                        if random.random() < 0.3:
-                            dialogue_manager.update_relationship(speaker, listener)
+                    # Konuşma sayacını artır
+                    villager.conversation_counter += 1
             
             # Son mesaj zamanını güncelle
             villager.last_chat_message_time = current_time
@@ -872,6 +1089,14 @@ def continue_chatting(villager, target_villager):
                     villager.last_message_was_question = False
                     # Zorunlu konuşma değişikliği
                     villager.last_chat_message_time = current_time - 10
+        
+        # Takılı kalma kontrolü (acil çözüm) - Konuşma başladı ama uzun süredir devam etmiyorsa
+        if hasattr(villager, 'last_chat_message_time'):
+            # 60 saniyeden uzun süredir hiç konuşma olmadıysa, acil durum çözümü uygula
+            if current_time - villager.last_chat_message_time > 60:
+                print(f"UYARI: {villager.name} ve {target_villager.name} arasında 60 saniyedir konuşma yok - konuşma sonlandırılıyor")
+                end_chat(villager, target_villager)
+                return NodeStatus.SUCCESS
                     
         return NodeStatus.RUNNING
     except Exception as e:
@@ -883,378 +1108,384 @@ def continue_chatting(villager, target_villager):
         try:
             if hasattr(villager, 'last_message_was_question'):
                 villager.last_message_was_question = False
+                
+            # Kritik hata durumunda acil çözüm
+            emergency_reset_villager(villager)
+            if target_villager:
+                emergency_reset_villager(target_villager)
         except:
             pass
             
         return NodeStatus.FAILURE
 
-def force_clear_bubble(villager):
-    """Zorla baloncuk temizleme (5 saniyeden fazla görünüyorsa)"""
-    try:
-        # Aktif baloncuk varsa zorla temizle
-        if hasattr(villager, 'active_bubble') and villager.active_bubble:
-            if hasattr(villager, 'current_bubble') and villager.current_bubble:
-                if hasattr(villager, 'game_controller') and villager.game_controller:
-                    villager.game_controller.remove_dialogue_bubble(villager.current_bubble)
-                villager.current_bubble = None
-            villager.active_bubble = False
-            print(f"{villager.name}'nin baloncuğu 5 saniyeden uzun görünüyordu, zorla temizlendi")
-    except Exception as e:
-        print(f"Zorla baloncuk temizleme hatası: {e}")
-        # Hata durumunda bile temizlemeye çalış
-        villager.active_bubble = False
-        villager.current_bubble = None
-
-def force_remove_bubble(villager, bubble):
-    """Köylünün baloncuğunu zorla kaldır ve kesinlikle aktif baloncuk durumunu güncelle"""
-    try:
-        # Baloncuğu kaldır
-        if hasattr(villager, 'game_controller') and villager.game_controller and bubble:
-            villager.game_controller.remove_dialogue_bubble(bubble)
-            
-        # Kesinlikle aktif baloncuk durumunu temizle
-        if hasattr(villager, 'active_bubble'):
-            villager.active_bubble = False
-            
-        # Mevcut baloncuk referansını temizle
-        if hasattr(villager, 'current_bubble'):
-            villager.current_bubble = None
-            
-        print(f"{villager.name}'nin baloncuğu temizlendi")
-            
-    except Exception as e:
-        print(f"HATA: Zorla baloncuk kaldırma hatası: {e}")
-        # Hata durumunda bile temizle
-        if hasattr(villager, 'active_bubble'):
-            villager.active_bubble = False
-        if hasattr(villager, 'current_bubble'):
-            villager.current_bubble = None
-
-def clear_all_dialogue_bubbles(villager):
-    """Köylünün tüm aktif diyalog baloncuklarını temizler"""
-    try:
-        # Aktif baloncuk temizle
-        if hasattr(villager, 'active_bubble'):
-            villager.active_bubble = False
-            
-        # Mevcut baloncuğu varsa kaldır
-        if hasattr(villager, 'current_bubble') and villager.current_bubble:
-            if hasattr(villager, 'game_controller') and villager.game_controller:
-                villager.game_controller.remove_dialogue_bubble(villager.current_bubble)
-        villager.current_bubble = None
-
-        # Game controller üzerinden tüm baloncukları temizle (ek güvenlik)
-        if hasattr(villager, 'game_controller') and villager.game_controller:
-            if hasattr(villager.game_controller, 'remove_all_dialogue_bubbles_for_villager'):
-                villager.game_controller.remove_all_dialogue_bubbles_for_villager(villager)
-            
-    except Exception as e:
-        print(f"HATA: Baloncuk temizleme hatası: {e}")
-        import traceback
-        traceback.print_exc()
-
-def remove_dialogue_bubble(villager, bubble):
-    """Diyalog baloncuğunu kaldır ve köylünün aktif baloncuk durumunu güncelle"""
-    try:
-        # Baloncuk geçerli mi kontrol et
-        if bubble is None:
-            villager.active_bubble = False
-            return
-            
-        # Game controller geçerli mi kontrol et
-        if hasattr(villager, 'game_controller') and villager.game_controller:
-            villager.game_controller.remove_dialogue_bubble(bubble)
-        
-        # Aktif baloncuk durumunu güncelle
-        villager.active_bubble = False
-        
-        # Mevcut baloncuk referansını temizle
-        if hasattr(villager, 'current_bubble'):
-            villager.current_bubble = None
-        
-    except Exception as e:
-        print(f"HATA: Baloncuk kaldırma hatası: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Hata durumunda da aktif bayrak temizlenir
-        villager.active_bubble = False
-        if hasattr(villager, 'current_bubble'):
-            villager.current_bubble = None
-
 def end_chat(villager, target_villager):
     """Sohbeti sonlandırır ve köylülerin hareketine izin verir"""
     try:
-        # Hedef kontrolü
-        if not target_villager:
-            if hasattr(villager, 'chat_partner'):
-                target_villager = villager.chat_partner
-            if not target_villager:
-                # Tek taraflı sonlandırma
-                if hasattr(villager, 'is_chatting'):
-                    villager.is_chatting = False
-                
-                # Tüm baloncukları temizle
-                clear_all_dialogue_bubbles(villager)
-                
-                # Köylünün tekrar hareket etmesine izin ver
-                if hasattr(villager, 'moving'):
-                    villager.moving = True
-                    
-                # Wandering bayrağını açarak dolaşmaya izin ver
-                if hasattr(villager, 'is_wandering'):
-                    villager.is_wandering = True
-                    
-                # Hızları geri yükle
-                if hasattr(villager, 'speed'):
-                    if hasattr(villager, '_original_speed'):
-                        villager.speed = villager._original_speed
-                    else:
-                        villager.speed = 0.35  # Varsayılan hız
-                
-                # Rasgele bir yöne doğru hareket ettir
-                if hasattr(villager, 'vx'):
-                    villager.vx = random.uniform(-1, 1) * villager.speed
-                    villager.vy = random.uniform(-1, 1) * villager.speed
-                
-                # Köylünün hedefini sıfırla
-                villager.chat_partner = None
-                
-                # Köylünün durumunu güncelle
-                villager.state = WANDERING
-                
-                # Cooldown ekle
-                cooldown_time = random.uniform(60, 180)
-                villager.chat_cooldown = time.time() + cooldown_time
-                
-                return NodeStatus.SUCCESS
+        print(f"{villager.name} ve {target_villager.name if target_villager else 'Bilinmeyen'} arasındaki sohbet sonlandırılıyor.")
         
-        # Her iki köylü için de baloncukları temizle
+        # Her iki köylünün diyalog baloncuklarını temizle
         clear_all_dialogue_bubbles(villager)
         if target_villager:
             clear_all_dialogue_bubbles(target_villager)
         
-        # Veda mesajı
-        goodbye_phrases = [
-            "Hoşça kal!",
-            "Görüşmek üzere!",
-            "Seninle konuşmak güzeldi, tekrar görüşelim!",
-            "İyi günler!",
-            "Sohbet için teşekkürler!",
-            "Kendine iyi bak!"
-        ]
+        # Villager'ı resetle
+        villager.is_chatting = False
+        villager.chat_partner = None
+        villager.state = WANDERING
         
-        # Rastgele veda mesajı seç
-        goodbye_message = random.choice(goodbye_phrases)
-        
-        # Vedalaşma mesajını göster
-        if hasattr(villager, 'game_controller') and villager.game_controller:
-            villager.active_bubble = True
-            bubble = villager.game_controller.create_dialogue_bubble(villager, goodbye_message)
-            if bubble:
-                # 3 saniye sonra veda baloncuğunu kaldır
-                villager.current_bubble = bubble
-                QTimer.singleShot(3000, lambda v=villager, b=bubble: remove_dialogue_bubble(v, b))
-        
-        # Veda mesajını kaydet
-        if dialogue_manager:
-            dialogue_manager.log_dialogue(villager, target_villager, goodbye_message)
-        
-        print(f"{villager.name} ve {target_villager.name} konuşmayı sonlandırdı: {goodbye_message}")
-        
-        # Sohbet durumlarını resetle
-        if hasattr(villager, 'is_chatting'):
-            villager.is_chatting = False
-        if hasattr(target_villager, 'is_chatting'):
-            target_villager.is_chatting = False
-            
-        # Köylülerin tekrar hareket etmesine izin ver
+        # Hareket etmeyi tekrar etkinleştir
         if hasattr(villager, 'moving'):
             villager.moving = True
-        if hasattr(target_villager, 'moving'):
-            target_villager.moving = True
-            
-        # Wandering bayrağını açarak dolaşmaya izin ver
         if hasattr(villager, 'is_wandering'):
             villager.is_wandering = True
-        if hasattr(target_villager, 'is_wandering'):
-            target_villager.is_wandering = True
             
         # Hızları geri yükle
+        if hasattr(villager, 'speed') and hasattr(villager, '_original_speed'):
+            villager.speed = villager._original_speed
+        else:
+            villager.speed = 0.35  # Varsayılan hız
+            
+        # Soru-cevap mekanizması bayrağını sıfırla
+        if hasattr(villager, 'last_message_was_question'):
+            villager.last_message_was_question = False
+            
+        # Konuşma sayacını sıfırla
+        if hasattr(villager, 'conversation_counter'):
+            villager.conversation_counter = 0
+            
+        # Son konuşan kişiyi sıfırla
+        if hasattr(villager, 'last_speaker'):
+            villager.last_speaker = None
+            
+        # Konuşma konusunu sıfırla
+        if hasattr(villager, 'conversation_topic'):
+            delattr(villager, 'conversation_topic')
+        
+        # Target villager'ı da güncelle
+        if target_villager:
+            target_villager.is_chatting = False
+            target_villager.chat_partner = None
+            target_villager.state = WANDERING
+            
+            # Hareket etmeyi tekrar etkinleştir
+            if hasattr(target_villager, 'moving'):
+                target_villager.moving = True
+            if hasattr(target_villager, 'is_wandering'):
+                target_villager.is_wandering = True
+                
+            # Hızları geri yükle
+            if hasattr(target_villager, 'speed') and hasattr(target_villager, '_original_speed'):
+                target_villager.speed = target_villager._original_speed
+            else:
+                target_villager.speed = 0.35  # Varsayılan hız
+                
+            # Soru-cevap mekanizması bayrağını sıfırla
+            if hasattr(target_villager, 'last_message_was_question'):
+                target_villager.last_message_was_question = False
+                
+            # Konuşma sayacını sıfırla
+            if hasattr(target_villager, 'conversation_counter'):
+                target_villager.conversation_counter = 0
+                
+            # Son konuşan kişiyi sıfırla
+            if hasattr(target_villager, 'last_speaker'):
+                target_villager.last_speaker = None
+                
+            # Konuşma konusunu sıfırla
+            if hasattr(target_villager, 'conversation_topic'):
+                delattr(target_villager, 'conversation_topic')
+            
+        # Rasgele yönlerde hareket et
+        if hasattr(villager, 'vx'):
+            villager.vx = random.uniform(-1, 1) * villager.speed
+            villager.vy = random.uniform(-1, 1) * villager.speed
+            
+        if target_villager and hasattr(target_villager, 'vx'):
+            target_villager.vx = random.uniform(-1, 1) * target_villager.speed
+            target_villager.vy = random.uniform(-1, 1) * target_villager.speed
+            
+        return NodeStatus.SUCCESS
+    except Exception as e:
+        print(f"Sohbet sonlandırma hatası: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Hata durumunda yine de en azından köylüleri serbest bırak
+        try:
+            if villager:
+                villager.is_chatting = False
+                villager.moving = True
+                villager.state = WANDERING
+                
+            if target_villager:
+                target_villager.is_chatting = False
+                target_villager.moving = True
+                target_villager.state = WANDERING
+        except:
+            pass
+            
+        return NodeStatus.FAILURE
+
+def emergency_reset_villager(villager):
+    """Takılı kalmış köylüyü acil durumda serbest bırakır"""
+    try:
+        print(f"ACİL DURUM: {villager.name} zorla serbest bırakılıyor.")
+        
+        # Tüm konuşma ve hareket verilerini sıfırla
+        villager.is_chatting = False
+        villager.chat_partner = None
+        villager.moving = True
+        villager.is_wandering = True
+        villager.speed = 0.35
+        villager.state = WANDERING
+        
+        # Tüm diyalog balonlarını temizle
+        clear_all_dialogue_bubbles(villager)
+        
+        # Hareket vektörlerini sıfırla
+        if hasattr(villager, 'vx'):
+            villager.vx = random.uniform(-1, 1) * villager.speed
+            villager.vy = random.uniform(-1, 1) * villager.speed
+            
+        # Diğer durumları sıfırla
+        if hasattr(villager, 'active_bubble'):
+            villager.active_bubble = False
+        if hasattr(villager, 'current_bubble'):
+            villager.current_bubble = None
+        if hasattr(villager, 'last_message_was_question'):
+            villager.last_message_was_question = False
+        if hasattr(villager, 'conversation_data'):
+            delattr(villager, 'conversation_data')
+            
+        return True
+    except Exception as e:
+        print(f"Acil durum kurtarma hatası: {e}")
+        return False
+
+def clear_all_dialogue_bubbles(villager):
+    """Köylünün tüm aktif diyalog baloncuklarını temizler"""
+    try:
+        # Mevcut baloncuğu temizle
+        if hasattr(villager, 'current_bubble') and villager.current_bubble:
+            force_remove_bubble(villager, villager.current_bubble)
+            
+        # Game controller üzerinden tüm baloncukları temizle
+        if hasattr(villager, 'game_controller') and villager.game_controller:
+            villager.game_controller.clear_dialogue_bubbles(villager)
+            
+        # Aktif baloncuk bayrağını kapat
+        if hasattr(villager, 'active_bubble'):
+            villager.active_bubble = False
+            
+        # Baloncuk başlangıç zamanını sıfırla
+        if hasattr(villager, 'bubble_start_time'):
+            villager.bubble_start_time = 0
+    except Exception as e:
+        print(f"Baloncuk temizleme hatası: {e}")
+        
+def end_chat(villager, target_villager):
+    """İki köylü arasındaki sohbeti sonlandırır"""
+    try:
+        print(f"{villager.name} ve {target_villager.name if target_villager else 'Bilinmeyen'} arasındaki sohbet sonlandırılıyor.")
+        
+        # Her iki köylünün diyalog baloncuklarını temizle
+        clear_all_dialogue_bubbles(villager)
+        if target_villager:
+            clear_all_dialogue_bubbles(target_villager)
+        
+        # Villager'ı resetle
+        villager.is_chatting = False
+        villager.chat_partner = None
+        villager.state = WANDERING
+        
+        # Hareket etmeyi tekrar etkinleştir
+        if hasattr(villager, 'moving'):
+            villager.moving = True
+        if hasattr(villager, 'is_wandering'):
+            villager.is_wandering = True
+            
+        # Hızları geri yükle
+        if hasattr(villager, 'speed') and hasattr(villager, '_original_speed'):
+            villager.speed = villager._original_speed
+        else:
+            villager.speed = 0.35  # Varsayılan hız
+            
+        # Soru-cevap mekanizması bayrağını sıfırla
+        if hasattr(villager, 'last_message_was_question'):
+            villager.last_message_was_question = False
+            
+        # Konuşma sayacını sıfırla
+        if hasattr(villager, 'conversation_counter'):
+            villager.conversation_counter = 0
+            
+        # Son konuşan kişiyi sıfırla
+        if hasattr(villager, 'last_speaker'):
+            villager.last_speaker = None
+            
+        # Konuşma konusunu sıfırla
+        if hasattr(villager, 'conversation_topic'):
+            delattr(villager, 'conversation_topic')
+        
+        # Target villager'ı da güncelle
+        if target_villager:
+            target_villager.is_chatting = False
+            target_villager.chat_partner = None
+            target_villager.state = WANDERING
+            
+            # Hareket etmeyi tekrar etkinleştir
+            if hasattr(target_villager, 'moving'):
+                target_villager.moving = True
+            if hasattr(target_villager, 'is_wandering'):
+                target_villager.is_wandering = True
+                
+            # Hızları geri yükle
+            if hasattr(target_villager, 'speed') and hasattr(target_villager, '_original_speed'):
+                target_villager.speed = target_villager._original_speed
+            else:
+                target_villager.speed = 0.35  # Varsayılan hız
+                
+            # Soru-cevap mekanizması bayrağını sıfırla
+            if hasattr(target_villager, 'last_message_was_question'):
+                target_villager.last_message_was_question = False
+                
+            # Konuşma sayacını sıfırla
+            if hasattr(target_villager, 'conversation_counter'):
+                target_villager.conversation_counter = 0
+                
+            # Son konuşan kişiyi sıfırla
+            if hasattr(target_villager, 'last_speaker'):
+                target_villager.last_speaker = None
+                
+            # Konuşma konusunu sıfırla
+            if hasattr(target_villager, 'conversation_topic'):
+                delattr(target_villager, 'conversation_topic')
+            
+        # Rasgele yönlerde hareket et
+        if hasattr(villager, 'vx'):
+            villager.vx = random.uniform(-1, 1) * villager.speed
+            villager.vy = random.uniform(-1, 1) * villager.speed
+            
+        if target_villager and hasattr(target_villager, 'vx'):
+            target_villager.vx = random.uniform(-1, 1) * target_villager.speed
+            target_villager.vy = random.uniform(-1, 1) * target_villager.speed
+            
+        return NodeStatus.SUCCESS
+    except Exception as e:
+        print(f"Sohbet sonlandırma hatası: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Hata durumunda yine de en azından köylüleri serbest bırak
+        try:
+            if villager:
+                villager.is_chatting = False
+                villager.moving = True
+                villager.state = WANDERING
+                
+            if target_villager:
+                target_villager.is_chatting = False
+                target_villager.moving = True
+                target_villager.state = WANDERING
+        except:
+            pass
+            
+        return NodeStatus.FAILURE
+
+def emergency_reset_villager(villager):
+    """Köylüyü acil durumda serbest bırak"""
+    try:
+        print(f"ACİL DURUM: {villager.name} zorla serbest bırakılıyor!")
+        
+        # Tüm baloncukları temizle
+        clear_all_dialogue_bubbles(villager)
+        
+        # Tüm bayrakları sıfırla
+        if hasattr(villager, 'is_chatting'):
+            villager.is_chatting = False
+        if hasattr(villager, 'chat_partner'):
+            villager.chat_partner = None
+        if hasattr(villager, 'moving'):
+            villager.moving = True
+        if hasattr(villager, 'is_wandering'):
+            villager.is_wandering = True
         if hasattr(villager, 'speed'):
             if hasattr(villager, '_original_speed'):
                 villager.speed = villager._original_speed
             else:
                 villager.speed = 0.35  # Varsayılan hız
-                
-        if hasattr(target_villager, 'speed'):
-            if hasattr(target_villager, '_original_speed'):
-                target_villager.speed = target_villager._original_speed
-            else:
-                target_villager.speed = 0.35  # Varsayılan hız
-        
-        # Köylüleri rasgele bir yöne doğru hareket ettir
+        if hasattr(villager, 'state'):
+            villager.state = WANDERING
+        if hasattr(villager, 'last_message_was_question'):
+            villager.last_message_was_question = False
         if hasattr(villager, 'vx'):
-            villager.vx = random.uniform(-1, 1) * villager.speed
-            villager.vy = random.uniform(-1, 1) * villager.speed
-        
-        if hasattr(target_villager, 'vx'):
-            target_villager.vx = random.uniform(-1, 1) * target_villager.speed
-            target_villager.vy = random.uniform(-1, 1) * target_villager.speed
-        
-        # Köylülerin hedeflerini sıfırla
-        villager.chat_partner = None
-        target_villager.chat_partner = None
-        
-        # Köylülerin durumlarını güncelle
-        villager.state = WANDERING
-        if hasattr(target_villager, 'state'):
-            target_villager.state = WANDERING
-        
-        # ÖNEMLİ: Yeni bir konuşma başlatmadan önce daha uzun bekleme süresi (cooldown) ekle
-        # Bu, köylülerin sürekli konuşmasını engelleyecek
-        cooldown_time = random.uniform(60, 180)  # 1-3 dakika arası bekleme
-        
-        # Köylülere chat_cooldown değişkeni ekle
-        villager.chat_cooldown = time.time() + cooldown_time
-        target_villager.chat_cooldown = time.time() + cooldown_time
-        
-        print(f"{villager.name} ve {target_villager.name} {int(cooldown_time)} saniye boyunca başka konuşma başlatmayacak.")
-        
-        return NodeStatus.SUCCESS
-    except Exception as e:
-        print(f"Sohbet sonlandırma hatası: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        # Hata durumunda da köylülerin durumunu reset et
-        if hasattr(villager, 'is_chatting'):
-            villager.is_chatting = False
-        if target_villager and hasattr(target_villager, 'is_chatting'):
-            target_villager.is_chatting = False
+            villager.vx = 0
+        if hasattr(villager, 'vy'):
+            villager.vy = 0
             
-        # Hata olsa da köylülerin hareket etmesine izin ver
-        try:
-            if hasattr(villager, 'moving'):
-                villager.moving = True
-            if target_villager and hasattr(target_villager, 'moving'):
-                target_villager.moving = True
-        except:
-            pass
+        # Cooldown zamanını 5 saniye sonrasına ayarla
+        villager.chat_cooldown = time.time() + 5
             
-        return NodeStatus.FAILURE
-
-def start_chat(villager, target_villager):
-    """İki köylü arasında sohbeti başlatır"""
-    try:
-        if not target_villager:
-            return False
-            
-        # Eğer köylülerden biri zaten sohbet ediyorsa, başlatma
-        if (hasattr(villager, 'is_chatting') and villager.is_chatting) or \
-           (hasattr(target_villager, 'is_chatting') and target_villager.is_chatting):
-            return False
-            
-        print(f"{villager.name}, {target_villager.name} ile sohbet başlatıyor.")
-        
-        # Sohbet durumunu ayarla
-        villager.is_chatting = True
-        villager.chat_partner = target_villager
-        
-        # Aktif baloncuk takibi için bayraklar ekle
-        villager.active_bubble = False
-        target_villager.active_bubble = False
-        
-        # Aktif baloncuk referansları
-        villager.current_bubble = None
-        target_villager.current_bubble = None
-        
-        # Baloncuk zaman takibi için
-        villager.bubble_start_time = time.time()
-        target_villager.bubble_start_time = time.time()
-        
-        # Soru-cevap durumu için değişken
-        villager.last_message_was_question = False
-        
-        # Konuşma konusunu başlat
-        villager.last_topic = random.choice(dialogue_manager.TOPICS)
-        
-        # Karşı köylünün durumunu da ayarla
-        target_villager.is_chatting = True
-        target_villager.chat_partner = villager
-        target_villager.last_message_was_question = False
-        target_villager.last_topic = villager.last_topic
-        
-        # Orijinal hızları sakla
-        if hasattr(villager, 'speed'):
-            villager._original_speed = villager.speed
-            villager.speed = 0  # Hareketi durdur
-        
-        if hasattr(target_villager, 'speed'):
-            target_villager._original_speed = target_villager.speed
-            target_villager.speed = 0  # Hareketi durdur
-        
-        # Hareket bayrağını kapat
-        if hasattr(villager, 'moving'):
-            villager.moving = False
-        if hasattr(target_villager, 'moving'):
-            target_villager.moving = False
-            
-        # Rastgele daha kısa sohbet süresi belirle (10-30 saniye arası)
-        chat_duration = random.uniform(10, 30)
-        villager.chat_end_time = time.time() + chat_duration
-        target_villager.chat_end_time = villager.chat_end_time
-        
-        # Selamlaşma mesajı
-        if dialogue_manager:
-            greeting = dialogue_manager.generate_greeting(villager, target_villager)
-            
-            # Selamın soru olup olmadığını kontrol et
-            if "?" in greeting:
-                villager.last_message_was_question = True
-                print(f"SELAMLAMA SORUSU: {villager.name} -> {target_villager.name}: '{greeting}'")
-            
-            # Diyalog baloncuğunu göster
-            message_display_time = 3000  # 3 saniye (ms)
-            if len(greeting) > 50:
-                message_display_time = 5000  # 5 saniye
-            
-            # Aktif baloncuk kaydı
-            villager.active_bubble = True
-            villager.bubble_start_time = time.time()
-                
-            if hasattr(villager, 'game_controller') and villager.game_controller:
-                bubble = villager.game_controller.create_dialogue_bubble(villager, greeting)
-                if bubble:
-                    # Baloncuğun kaldırılması - baloncuk referansını koru
-                    villager.current_bubble = bubble
-                    QTimer.singleShot(message_display_time, lambda v=villager, b=bubble: force_remove_bubble(v, b))
-                else:
-                    # Baloncuk oluşturulamadıysa aktif bayrak temizle
-                    villager.active_bubble = False
-            else:
-                # Game controller yok veya bubble oluşturulamadı
-                villager.active_bubble = False
-            
-            # Diyaloğu kaydet
-            dialogue_manager.log_dialogue(villager, target_villager, greeting)
-        
-        # Son mesaj zamanını ayarla
-        villager.last_chat_message_time = time.time()
-        
         return True
     except Exception as e:
-        print(f"Sohbet başlatma hatası: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        # Hata durumunda köylülerin durumunu reset et
-        try:
-            if hasattr(villager, 'is_chatting'):
-                villager.is_chatting = False
-            if hasattr(target_villager, 'is_chatting'):
-                target_villager.is_chatting = False
-        except:
-            pass
+        print(f"ACİL DURUM RESET HATASI: {e}")
+        return False
+
+# Diyalog baloncuklarını temizlemek için fonksiyonlar
+
+def force_remove_bubble(villager, bubble):
+    """Baloncuğu zorla kaldırır"""
+    try:
+        if hasattr(villager, 'game_controller') and villager.game_controller:
+            if hasattr(villager.game_controller, 'remove_dialogue_bubble'):
+                # Baloncuğu kaldır
+                villager.game_controller.remove_dialogue_bubble(bubble)
             
-        return False 
+        # Aktif bayrağı ve mevcut baloncuğu temizle
+        villager.active_bubble = False
+        villager.current_bubble = None
+        
+        print(f"{villager.name}'nin baloncuğu zorla kaldırıldı")
+    except Exception as e:
+        print(f"Baloncuk kaldırma hatası: {e}")
+
+def clear_all_dialogue_bubbles(villager):
+    """Köylünün tüm aktif diyalog baloncuklarını temizler"""
+    try:
+        # Mevcut baloncuğu varsa kaldır
+        if hasattr(villager, 'current_bubble') and villager.current_bubble:
+            force_remove_bubble(villager, villager.current_bubble)
+        
+        # Ekstra güvenlik - aktif bayrağı temizleme
+        if hasattr(villager, 'active_bubble'):
+            villager.active_bubble = False
+        
+        print(f"{villager.name}'nin tüm baloncukları temizlendi")
+    except Exception as e:
+        print(f"Tüm baloncukları temizleme hatası: {e}")
+
+def remove_dialogue_bubble(villager, bubble):
+    """Diyalog baloncuğunu kaldırır"""
+    try:
+        # Baloncuk geçerli mi kontrol et
+        if not bubble:
+            return
+            
+        # Game controller mevcut mu kontrol et
+        if not hasattr(villager, 'game_controller') or not villager.game_controller:
+            return
+            
+        # Fonksiyon mevcut mu kontrol et
+        if hasattr(villager.game_controller, 'remove_dialogue_bubble'):
+            # Lambda yöntemiyle doğru işlev referansını geçir
+            # Bu, kapanma (closure) ile doğru şekilde çalışmasını sağlar
+            villager.game_controller.remove_dialogue_bubble(bubble)
+            
+            # Temizleme işlemi tamamlandı
+            villager.active_bubble = False
+            villager.current_bubble = None
+            
+    except Exception as e:
+        print(f"Baloncuk kaldırma hatası: {e}")
+        # Hata olsa bile bayrağı temizlemeye çalış
+        if hasattr(villager, 'active_bubble'):
+            villager.active_bubble = False

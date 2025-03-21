@@ -50,8 +50,10 @@ class MainWindow(QMainWindow):
         ground_height = 200
         if self.game_controller:
             ground_height = self.game_controller.ground_height
-            
-        self.ground_widget.setFixedSize(total_width, ground_height)
+        
+        # Tam ekran boyutunda olacak şekilde ayarla
+        print(f"GroundWidget boyutu ayarlanıyor: {total_width}x{max_height}")
+        self.ground_widget.setFixedSize(total_width, max_height)
         layout.addWidget(self.ground_widget)
         
         # Kontrol paneli
@@ -88,15 +90,17 @@ class MainWindow(QMainWindow):
             self.game_controller.villagers_updated.emit(self.game_controller.villagers)
         
         # Pencereyi tüm ekranları kapsayacak şekilde ayarla
-        window_y = max_height - ground_height
-        self.setGeometry(min_x, window_y, total_width, ground_height)
+        # Tam ekran boyutunda bir pencere yap
+        self.setGeometry(min_x, 0, total_width, max_height)
         
         # Debug bilgisi
         print(f"Toplam genişlik: {total_width}")
+        print(f"Maksimum yükseklik: {max_height}")
         print(f"Başlangıç X: {min_x}")
-        print(f"Başlangıç Y: {window_y}")
+        print(f"Başlangıç Y: 0")
         print(f"Ekran sayısı: {desktop.screenCount()}")
         print(f"Kontrol paneli konumu: ({control_panel_x}, 20)")
+        print(f"GroundWidget boyutu: {self.ground_widget.width()}x{self.ground_widget.height()}")
     
     def paintEvent(self, event):
         """Pencereyi çiz"""

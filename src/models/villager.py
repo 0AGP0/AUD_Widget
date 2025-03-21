@@ -42,7 +42,7 @@ class Villager:
     mood: str = "Sakin"  # Günlük ruh hali
     
     # Hareket özellikleri
-    speed: float = 0.35  # Hızı 5.0'dan 1.0'a düşürdük
+    speed: float = 0.65  # Hızı 5.0'dan 1.0'a düşürdük
     move_counter: int = 0
     max_move_time: int = 50
     is_wandering: bool = True
@@ -308,42 +308,42 @@ class Villager:
                     self.state = "Ağaç Arıyor" if not self.is_cutting else "Ağaç Kesiyor"
                 else:
                     self.wander()  # Limit dolmuşsa dolaş
-                    self.state = "Dolaşıyor (Limit)"
+                    self.state = "Yoruldu Dolaşıyor"
             elif self.profession == "İnşaatçı":
                 if self.buildings_built < self.max_buildings_per_day:
                     self.handle_builder()
                     self.state = "İnşaat Arıyor" if not self.is_building else "İnşaat Yapıyor"
                 else:
                     self.wander()
-                    self.state = "Dolaşıyor (Limit)"
+                    self.state = "Yoruldu Dolaşıyor"
             elif self.profession == "Avcı":
                 if self.animals_hunted < self.max_hunts_per_day:
                     self.handle_hunter()
                     self.state = "Avlanıyor"
                 else:
                     self.wander()
-                    self.state = "Dolaşıyor (Limit)"
+                    self.state = "Yoruldu Dolaşıyor"
             elif self.profession == "Çiftçi":
                 if self.crops_harvested < self.max_harvests_per_day:
                     self.handle_farmer()
                     self.state = "Çiftçilik Yapıyor"
                 else:
                     self.wander()
-                    self.state = "Dolaşıyor (Limit)"
+                    self.state = "Yoruldu Dolaşıyor"
             elif self.profession == "Gardiyan":
                 if self.patrol_count < self.max_patrols_per_day:
                     self.handle_guard()
                     self.state = "Devriye Geziyor"
                 else:
                     self.wander()
-                    self.state = "Dolaşıyor (Limit)"
+                    self.state = "Yoruldu Dolaşıyor"
             elif self.profession == "Papaz":
                 if self.ceremonies_performed < self.max_ceremonies_per_day:
                     self.handle_priest()
                     self.state = "Dua Ediyor"
                 else:
                     self.wander()
-                    self.state = "Dolaşıyor (Limit)"
+                    self.state = "Yoruldu Dolaşıyor"
             else:
                 self.wander()  # Diğer meslekler dolaşır
                 self.state = "Dolaşıyor"

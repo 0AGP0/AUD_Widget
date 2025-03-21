@@ -2,26 +2,21 @@ from typing import List, Optional
 from PyQt5.QtCore import QObject, pyqtSignal, QRect, QTimer, QPoint
 from PyQt5.QtWidgets import QApplication, QDesktopWidget, QMainWindow
 from PyQt5.QtGui import QScreen, QColor
-try:
-    from src.models.building import Building
-except ImportError:
-    # Alternatif import yöntemi
-    import sys
-    from pathlib import Path
-    src_dir = str(Path(__file__).resolve().parent.parent.parent)
-    if src_dir not in sys.path:
-        sys.path.append(src_dir)
-    from src.models.building import Building
-
-from src.models.villager import Villager, TestVillager
-from src.models.tree import Tree
-from src.models.building_site import BuildingSite
-from src.models.house import House
 import random
-import os
 import time
-from PyQt5.QtCore import QObject, QTimer
-from src.models.ai.dialogue.dialogue_manager import DialogueManager  # Diyalog Yöneticisi İçin Import Ekle
+import os
+import math
+from PyQt5.QtCore import QObject, QTimer, QThread, QDateTime
+from PyQt5.QtWidgets import QDesktopWidget
+from ..models.tree import Tree
+from ..models.villager import Villager
+from ..models.building import Building
+from ..models.building_site import BuildingSite
+from ..models.house import House
+from ..models.wolf import Wolf
+from ..models.bird import Bird
+from ..models.ai.dialogue.dialogue_manager import DialogueManager
+from ..utils.constants import MALE_NAMES, FEMALE_NAMES, PROFESSIONS
 
 class GameController(QObject):
     """Oyun kontrolcü sınıfı"""
@@ -32,68 +27,77 @@ class GameController(QObject):
     DAY_DURATION = 300  # 5 dakika (saniye cinsinden)
     NIGHT_DURATION = 180  # 3 dakika (saniye cinsinden)
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        """Game Controller sınıfını başlat"""
+        super().__init__(parent)
         
         print("GameController başlatılıyor...")
+        
+        # Oyun öğeleri
+        self.trees = []          # Ağaçlar
+        self.villagers = []      # Köylüler
+        self.wolves = []         # Kurtlar
+        self.birds = []          # Kuş ve kargalar
+        self.structures = []     # Yapılar
+        self.building_sites = [] # İnşaat alanları
+        self.houses = []         # Evler
         
         # Gece/Gündüz sistemi için değişkenler
         self.is_daytime = True  # True = Gündüz, False = Gece
         self.remaining_time = self.DAY_DURATION * 1000  # Milisaniye cinsinden
+        self.day_count = 1      # Gün sayısı
         
-        # Diyalog yöneticisini oluştur
-        self.dialogue_manager = DialogueManager()
-        self.dialogue_manager.set_game_controller(self)
-        
-        # Tüm ekranları al
-        desktop = QDesktopWidget()
-        
-        # Ekran sayısını ve toplam genişliği hesapla
-        screen_count = desktop.screenCount()
-        total_width = 0
-        min_x = float('inf')
-        max_height = 0
-        
-        print(f"Ekran sayısı: {screen_count}")
-        
-        # Her ekranın bilgilerini topla
-        for i in range(screen_count):
-            screen_geo = desktop.screenGeometry(i)
-            total_width += screen_geo.width()
-            min_x = min(min_x, screen_geo.x())
-            max_height = max(max_height, screen_geo.height())
-            print(f"Ekran {i+1}: ({screen_geo.x()}, {screen_geo.y()}, {screen_geo.width()}x{screen_geo.height()})")
-        
-        # Zemin yüksekliği
-        self.ground_height = 800  # Zemin yüksekliği
-        
-        # Zeminin y pozisyonunu ekranın en altına ayarla
-        self.ground_y = max_height - self.ground_height
-        
-        # Oyun nesneleri
-        print("Oyun nesneleri oluşturuluyor...")
-        self.buildings = []
-        self.trees = []
-        self.villagers = []
-        self.building_sites = []  # İnşaat alanları
-        self.houses = []  # Evler
-        self.selected_villager = None
-        
-        # Döngüsel import sorununu çözmek için, GameWindow sınıfını import etmek yerine,
-        # QMainWindow sınıfını kullanacağız ve pencereyi daha sonra oluşturacağız
-        self.window = None
-        
-        # Kontrol paneli referansı
-        self.control_panel = None
-        
-        # Sadece bir zamanlayıcı kullan - kalan süreyi güncelle
-        print("Zamanlayıcı oluşturuluyor...")
+        # Zamanı izleyen timer
         self.time_timer = QTimer()
         self.time_timer.timeout.connect(self.update_remaining_time)
         self.time_timer.start(1000)  # Her saniye güncelle
         
+        # Kaynaklar
+        self.food = 0
+        self.wood = 0
+        self.stone = 0
+        self.gold = 100
+        
+        # Timer'lar
+        self.last_resource_update = time.time()
+        self.last_periodic_update = time.time()
+        self.last_bird_spawn = time.time()  # Son kuş oluşturma zamanı
+        
+        # Oyun kontrolcüsü için değişkenler
+        self.castle = None
+        self.ground_y = 600  # Varsayılan zemin Y koordinatı
+        self.ground_height = 25  # Zemin yüksekliği
+        
+        # Diyalog yöneticisini başlat
+        self.dialogue_manager = DialogueManager()
+        self.dialogue_manager.set_game_controller(self)
+        print("Diyalog yöneticisi başlatıldı")
+        
+        # Ekran boyutlarını al ve zemini ayarla
+        desktop = QDesktopWidget()
+        max_height = 0
+        
+        # Tüm ekranların yüksekliklerini kontrol et ve en büyüğünü bul
+        for i in range(desktop.screenCount()):
+            screen_geo = desktop.screenGeometry(i)
+            if screen_geo.height() > max_height:
+                max_height = screen_geo.height()
+        
+        print(f"Ekran yüksekliği: {max_height}")
+        
+        # Zeminin y pozisyonunu ekranın en altına ayarla
+        self.ground_y = max_height - self.ground_height
+        
         print("GameController başlatıldı")
         # NOT: setup_game() ve window.show() çağrıları kaldırıldı
+        
+        # Rastgelelik için seed ayarla
+        random.seed(time.time())
+        
+        # Bird spawn settings
+        self.bird_spawn_interval = 15.0  # Saniye
+        self.bird_spawn_chance = 0.3     # %30 şans
+        self.max_birds = 5              # Maksimum aynı anda kuş sayısı
     
     def setup_game(self):
         """Oyunu başlat ve gerekli nesneleri oluştur"""
@@ -127,6 +131,11 @@ class GameController(QObject):
             self.castle.add_to_inventory("odun", 0)
             print("Kale envanterine 0 odun eklendi")
             
+            # Mağarayı oluştur
+            print("Mağara oluşturuluyor...")
+            self.create_cave()
+            print("Mağara oluşturuldu")
+            
             # Ağaçları oluştur
             print("Ağaçlar oluşturuluyor...")
             self.create_trees()
@@ -136,6 +145,11 @@ class GameController(QObject):
             print("Köylüler oluşturuluyor...")
             self.create_initial_villagers()
             print(f"{len(self.villagers)} köylü oluşturuldu")
+            
+            # Kurtları oluştur
+            print("Kurtlar oluşturuluyor...")
+            self.create_wolves()
+            print(f"{len(self.wolves)} kurt oluşturuldu")
             
             # Kontrol panelini güncelle
             print("Kontrol paneli güncelleniyor...")
@@ -169,8 +183,8 @@ class GameController(QObject):
             self.trees = []
             
             # Tüm ağaçlar için sabit boyutlar
-            tree_width = 80
-            tree_height = 120
+            tree_width = 70  # 80'den 50'ye düşürüldü
+            tree_height = 80  # 120'den 80'e düşürüldü
             
             # Kale pozisyonu (varsayılan olarak x=0)
             castle_x = 0
@@ -229,19 +243,23 @@ class GameController(QObject):
                             break
                     
                     if is_valid_position:
+                        # Rastgele ağaç tipi seç (1, 2 veya 3)
+                        tree_type = random.randint(1, 3)
+                        
                         # Ağacı oluştur
                         tree = Tree(
                             x=x,  # Rastgele x pozisyonu
                             y=0,  # Y pozisyonu çizim sırasında hesaplanacak
                             width=tree_width,  # Sabit genişlik
                             height=tree_height,  # Sabit yükseklik
+                            tree_type=tree_type  # Ağaç tipi
                         )
                         
                         # Ağacı listeye ekle
                         self.trees.append(tree)
                         total_trees += 1
                         trees_in_region += 1
-                        print(f"Ağaç {total_trees} oluşturuldu: ({tree.x:.1f}, {tree.y}), bölge: {region+1}")
+                        print(f"Ağaç {total_trees} oluşturuldu: ({tree.x:.1f}, {tree.y}), tip: {tree_type}, bölge: {region+1}")
                     
                     attempts += 1
                 
@@ -260,7 +278,7 @@ class GameController(QObject):
         try:
             print("Köylüler oluşturuluyor...")
             # Meslekleri güncelle
-            professions = ["Oduncu", "İnşaatçı", "Avcı", "Çiftçi", "Gardiyan", "Papaz"]
+            professions = PROFESSIONS.copy()
             
             # Zorunlu meslekleri takip etmek için
             has_lumberjack = False  # Oduncu
@@ -269,8 +287,8 @@ class GameController(QObject):
             has_priest = False      # Papaz
             
             # Erkek ve kadın isimleri
-            male_names = ["Ahmet", "Mehmet", "Ali", "Mustafa", "Hasan", "Hüseyin", "İbrahim", "Osman", "Yusuf", "Murat"]
-            female_names = ["Ayşe", "Fatma", "Zeynep", "Emine", "Hatice", "Merve", "Elif", "Esra", "Seda", "Gül"]
+            male_names = MALE_NAMES.copy()  # Orijinal listeyi değiştirmemek için copy kullanıyoruz
+            female_names = FEMALE_NAMES.copy()
             
             print(f"Erkek isimleri: {male_names}")
             print(f"Kadın isimleri: {female_names}")
@@ -522,6 +540,14 @@ class GameController(QObject):
                     villager.move()
                     villager.update_animation()
             
+            # Kurtları güncelle
+            for wolf in self.wolves:
+                wolf.move()
+                wolf.update_animation()
+            
+            # Kuşları güncelle
+            self.update_birds()
+            
             # Ağaç animasyonlarını güncelle
             for tree in self.trees:
                 tree.update_animation()
@@ -590,56 +616,92 @@ class GameController(QObject):
             import traceback
             traceback.print_exc()
     
-    def get_remaining_time(self) -> tuple[int, int]:
-        """Kalan süreyi dakika ve saniye olarak döndür"""
-        minutes = self.remaining_time // 60000  # milisaniyeyi dakikaya çevir
-        seconds = (self.remaining_time % 60000) // 1000  # kalan milisaniyeyi saniyeye çevir
+    def get_time_as_minutes_seconds(self):
+        """Kalan süreyi dakika:saniye formatında döndür"""
+        minutes = self.remaining_time // 60000
+        seconds = (self.remaining_time // 1000) % 60
         return minutes, seconds
     
     def update_remaining_time(self):
         """Kalan süreyi güncelle"""
         try:
             # Kalan süreyi azalt
-            self.remaining_time -= 1000  # Her saniye 1000 milisaniye azalt
+            self.remaining_time -= 1000  # 1 saniye (milisaniye cinsinden)
             
-            # Kalan süre bittiyse gece-gündüz değişimi yap
+            # Süre doldu mu kontrol et
             if self.remaining_time <= 0:
-                # Gündüz/gece durumunu değiştir
+                # Gece/gündüz durumunu değiştir
                 self.is_daytime = not self.is_daytime
                 
                 # Yeni süreyi ayarla
                 if self.is_daytime:
-                    self.remaining_time = self.DAY_DURATION * 1000  # Gündüz süresi
-                    print(f"Gündüz başladı. Süre: {self.DAY_DURATION} saniye")
-                    
-                    # Gündüz başladığında köylüleri dolaşmaya başlat
-                    for villager in self.villagers:
-                        if villager.profession == "Oduncu":
-                            villager.trees_cut_today = 0
-                            print(f"{villager.name} yeni güne başladı, kesme hakkı: {villager.max_trees_per_day}")
-                        elif villager.profession == "İnşaatçı":
-                            villager.buildings_built = 0
-                            print(f"{villager.name} yeni güne başladı, inşaat hakkı: {villager.max_buildings_per_day}")
-                    self.start_villagers_wandering()
+                    self.remaining_time = self.DAY_DURATION * 1000
+                    self.day_count += 1  # Gündüz başladığında gün sayısını artır
+                    print(f"Gün {self.day_count} başladı")
                 else:
-                    self.remaining_time = self.NIGHT_DURATION * 1000  # Gece süresi
-                    print(f"Gece başladı. Süre: {self.NIGHT_DURATION} saniye")
-                    
-                    # Gece başladığında köylüleri kaleye döndür
-                    self.return_villagers_to_castle()
+                    self.remaining_time = self.NIGHT_DURATION * 1000
+                    print(f"Gün {self.day_count} sona erdi, gece başladı")
                 
-                # Sinyal gönder
+                # Gündüz veya gece değişimi olduğunda özel işlemler
+                self.handle_day_night_change()
+            
+            # Dakika ve saniye formatında kalan süreyi al
+            minutes, seconds = self.get_time_as_minutes_seconds()
+            
+            # Debug için kalan süreyi yazdır
+            # print(f"Gündüz/Gece Kalan Süre: {minutes:02d}:{seconds:02d}")
+                
+        except Exception as e:
+            print(f"HATA: Süre güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def handle_day_night_change(self):
+        """Gündüz veya gece değişimi olduğunda yapılacak işlemler"""
+        try:
+            if self.is_daytime:
+                # Gündüz başladığında köylüleri dolaşmaya başlat
+                for villager in self.villagers:
+                    if hasattr(villager, 'update_daytime'):
+                        villager.update_daytime(self.is_daytime)
+                    
+                    # Oduncuların günlük kesme hakkını sıfırla
+                    if villager.profession == "Oduncu":
+                        villager.trees_cut_today = 0
+                        print(f"{villager.name} yeni güne başladı, kesme hakkı: {villager.max_trees_per_day}")
+                    
+                    # İnşaatçıların günlük inşaat hakkını sıfırla
+                    elif villager.profession == "İnşaatçı":
+                        villager.buildings_built = 0
+                        print(f"{villager.name} yeni güne başladı, inşaat hakkı: {villager.max_buildings_per_day}")
+                
+                # Köylüleri dolaşmaya başlat
+                if hasattr(self, 'start_villagers_wandering'):
+                    self.start_villagers_wandering()
+            else:
+                # Gece başladığında köylüleri kaleye döndür
+                if hasattr(self, 'return_villagers_to_castle'):
+                    self.return_villagers_to_castle()
+            
+            # Kurtların gündüz/gece durumunu güncelle
+            for wolf in self.wolves:
+                if hasattr(wolf, 'update_daytime'):
+                    wolf.update_daytime(self.is_daytime)
+            
+            # Sinyal gönder (eğer bu sinyal varsa)
+            if hasattr(self, 'day_night_changed'):
                 self.day_night_changed.emit(self.is_daytime)
-                print(f"Gündüz/gece değişti: {'Gündüz' if self.is_daytime else 'Gece'}")
+            
+            print(f"Gündüz/gece değişti: {'Gündüz' if self.is_daytime else 'Gece'}")
             
             # Kontrol panelini güncelle
             if hasattr(self, 'control_panel') and self.control_panel:
                 # Kontrol paneli hazırsa update_time_label metodunu çağır
                 if hasattr(self.control_panel, 'update_time_label'):
                     self.control_panel.update_time_label()
-            
+                    
         except Exception as e:
-            print(f"HATA: Kalan süre güncelleme hatası: {e}")
+            print(f"HATA: Gündüz/gece değişim işlemi hatası: {e}")
             import traceback
             traceback.print_exc()
     
@@ -693,8 +755,8 @@ class GameController(QObject):
             max_x = total_width - 100  # Ekranın sağ kenarından 100 piksel içeride
             
             # Ağaç boyutları
-            tree_width = 80
-            tree_height = 120
+            tree_width = 50  # 80'den 50'ye düşürüldü
+            tree_height = 80  # 120'den 80'e düşürüldü
             
             # Ağaçlar arası minimum mesafe
             min_distance = 50
@@ -722,11 +784,14 @@ class GameController(QObject):
             
             y = self.ground_height - 100  # Zemin üzerinde
             
-            new_tree = Tree(x, y, tree_width, tree_height)
+            # Rastgele ağaç tipi seç (1 veya 2)
+            tree_type = random.randint(1, 2)
+            
+            new_tree = Tree(x, y, tree_width, tree_height, tree_type=tree_type)
             new_tree.tree_removed.connect(self.on_tree_removed)
             self.trees.append(new_tree)
             
-            print(f"Yeni ağaç eklendi: ID: {new_tree.id}, Konum: ({x}, {y})")
+            print(f"Yeni ağaç eklendi: ID: {new_tree.id}, Tip: {tree_type}, Konum: ({x}, {y})")
             
         except Exception as e:
             print(f"HATA: Yeni ağaç ekleme hatası: {e}")
@@ -944,7 +1009,10 @@ class GameController(QObject):
                         message,
                         relationship
                     )
-                
+            
+            # Her baloncuk için 3 saniyelik otomatik silme zamanlayıcısı ekle
+            QTimer.singleShot(3000, lambda v=villager: self.remove_dialogue_bubble(v))
+            
             # İşlem başarılı
             return True
             
@@ -975,4 +1043,267 @@ class GameController(QObject):
             print(f"HATA: Diyalog baloncuğu kaldırma hatası: {e}")
             import traceback
             traceback.print_exc()
-            return False 
+            return False
+    
+    def create_wolves(self, num_wolves=5):
+        """Kurtları oluştur"""
+        try:
+            # Kurtları temizle
+            self.wolves = []
+            
+            # Mağara konumunu bul
+            cave_x = 2500  # Varsayılan mağara konumu
+            
+            # Eğer mağara nesnesi varsa, onun konumunu kullan
+            for structure in self.structures:
+                if hasattr(structure, 'name') and structure.name == "cave":
+                    cave_x = structure.x
+                    break
+            
+            print(f"Mağara konumu: x={cave_x}")
+            
+            # Kalenin konumunu belirle
+            castle_x = 0
+            if hasattr(self, 'castle') and self.castle:
+                castle_x = self.castle.x
+            
+            # Belirtilen sayıda kurt oluştur
+            for i in range(num_wolves):
+                # Mağaranın etrafında rastgele x pozisyonu
+                wolf_x = cave_x + random.randint(-200, 200)
+                
+                # Doğru yapıcı parametrelerini geçerek kurt oluştur
+                wolf = Wolf(
+                    wolf_id=i+1,  # wolf_id parametresi gerekli
+                    x=wolf_x,
+                    y=0,  # Y koordinatı önemsiz, yer seviyesine otomatik konumlandırılacak
+                    width=50,
+                    height=35
+                )
+                
+                # Mağara konumunu ayarla
+                wolf.cave_x = cave_x
+                # Köy sınırını ayarla
+                wolf.min_x = castle_x + 500
+                
+                # Game controller'ı ayarla
+                wolf.set_game_controller(self)
+                
+                # Dolaşmaya başlat
+                wolf.wander()
+                
+                # Kurt nesnesini listeye ekle
+                self.wolves.append(wolf)
+                print(f"Kurt {i+1} oluşturuldu: x={wolf_x}, cave_x={cave_x}, min_x={wolf.min_x}")
+                
+            print(f"Toplam {num_wolves} kurt oluşturuldu")
+                
+        except Exception as e:
+            print(f"HATA: Kurt oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def create_cave(self):
+        """Mağarayı oluştur"""
+        try:
+            # Tüm ekranların toplam genişliğini kullan
+            total_width = 0
+            desktop = QDesktopWidget()
+            for i in range(desktop.screenCount()):
+                screen_geo = desktop.screenGeometry(i)
+                total_width += screen_geo.width()
+            
+            # Mağaranın x pozisyonu (ekranın en sağ tarafı)
+            cave_x = total_width - 200
+            
+            # Mağara nesnesi oluştur
+            cave = Building(
+                x=cave_x,
+                y=self.ground_y,
+                width=100,
+                height=70,
+                building_type="cave"
+            )
+            
+            # Nesneye özel adı ekle
+            cave.name = "cave"
+            
+            # Structures listesine ekle
+            self.structures.append(cave)
+            
+            print(f"Mağara oluşturuldu: x={cave_x}, y={self.ground_y}")
+            return cave
+            
+        except Exception as e:
+            print(f"HATA: Mağara oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def update_birds(self):
+        """Kuşları güncelle ve gerekirse yenilerini oluştur"""
+        try:
+            current_time = time.time()
+            dt = 0.016  # Yaklaşık 60 FPS için 1/60 saniye
+            
+            # Ağaç yüksekliği ve zemin seviyesi bilgilerini hesapla
+            tree_height = 80  # Varsayılan ağaç yüksekliği
+            tree_top_y = self.ground_y - tree_height  # Ağacın tepesinin y koordinatı
+            
+            # Kuşların uçabileceği yükseklikleri belirle
+            min_flight_y = tree_top_y  # En düşük uçuş seviyesi (ağaç tepesi)
+            max_flight_y = tree_top_y - 100  # En yüksek uçuş seviyesi (ağaç tepesinden 100px yukarı)
+            
+            # Kuşları güncelle ve kaldırılacak olanları işaretle
+            birds_to_remove = []
+            for bird in self.birds:
+                # Yükseklik sınırlarını kontrol et
+                if bird.y < max_flight_y:
+                    bird.y = float(max_flight_y)
+                elif bird.y > min_flight_y:
+                    bird.y = float(min_flight_y)
+                
+                # Kuşu güncelle
+                bird.update(dt)
+                if bird.should_remove:
+                    birds_to_remove.append(bird)
+            
+            # Kaldırılacak kuşları listeden çıkar
+            for bird in birds_to_remove:
+                print(f"{bird.bird_type.capitalize()} #{bird.bird_id} oyundan kaldırıldı")
+                self.birds.remove(bird)
+            
+            # Debug: Kuş sayısını göster
+            print(f"Mevcut kuş sayısı: {len(self.birds)}")
+            
+            # Belirli aralıklarla yeni kuşlar oluştur
+            if len(self.birds) < self.max_birds and current_time - self.last_bird_spawn > self.bird_spawn_interval:
+                self.last_bird_spawn = current_time
+                
+                # Belirli bir şansla kuş oluştur
+                if random.random() < self.bird_spawn_chance:
+                    new_bird = self.spawn_bird()
+                    if new_bird:
+                        print(f"Yeni kuş oluşturuldu: {new_bird.bird_type} #{new_bird.bird_id}")
+            
+        except Exception as e:
+            print(f"HATA: Kuş güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def spawn_bird(self):
+        """Rastgele bir ağaçta kuş veya karga oluştur"""
+        try:
+            if not self.trees:
+                print("UYARI: Kuş oluşturmak için ağaç yok")
+                return
+            
+            # Rastgele bir ağaç seç
+            visible_trees = [tree for tree in self.trees if tree.is_visible]
+            if not visible_trees:
+                print("UYARI: Görünür ağaç yok, kuş oluşturulamıyor")
+                return
+                
+            source_tree = random.choice(visible_trees)
+            
+            # Kuş ID'si
+            bird_id = len(self.birds) + 1
+            
+            # Kuş tipi (kus veya karga)
+            bird_type = random.choice(["kus", "karga"])
+            
+            # Ağaç özelliklerini al
+            tree_x = source_tree.x
+            tree_y = source_tree.y
+            tree_height = source_tree.height
+            
+            # Kuşun başlangıç pozisyonu - tam ağacın tepesinde
+            x = tree_x  # Ağacın X koordinatı
+            
+            # Ağacın tepesine yerleştir
+            y = self.ground_y - tree_height  # Ağacın tam tepesinde
+            
+            print(f"Kuş oluşturuluyor: Ağaç konumu: ({tree_x}, {tree_y}), yükseklik: {tree_height}, kuş başlangıç Y: {y}")
+            
+            # Kuş veya karga boyutları - daha küçük boyutlar için %60 oranında küçült
+            if bird_type == "kus":
+                width = 40 * 0.6
+                height = 30 * 0.6
+            else:  # karga
+                width = 50 * 0.6
+                height = 40 * 0.6
+            
+            # Kuş veya karga oluştur
+            bird = Bird(
+                bird_id=bird_id,
+                x=x,
+                y=y,
+                width=width,
+                height=height,
+                bird_type=bird_type
+            )
+            
+            # Game controller'ı ayarla
+            bird.game_controller = self
+            
+            # Hedef yüksekliği sınırla - en fazla ağaç tepesinden 100px yukarı
+            min_flight_y = y  # En düşük seviye (ağaç tepesi)
+            max_flight_y = y - 100  # En yüksek seviye (ağaç tepesinden 100px yukarı)
+            
+            # Hedef yüksekliği sınırlar içinde ayarla
+            bird.target_altitude = random.uniform(max_flight_y, min_flight_y)
+            
+            # Kuşlar listesine ekle
+            self.birds.append(bird)
+            print(f"Yeni {bird_type} #{bird_id} oluşturuldu: x={x}, y={y}, hedef_yükseklik={bird.target_altitude}")
+            
+            return bird
+            
+        except Exception as e:
+            print(f"HATA: Kuş oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def update_game_loop(self):
+        """Oyun döngüsünü güncelle"""
+        try:
+            current_time = time.time()
+            
+            # Köylü hareketlerini güncelle
+            for villager in self.villagers:
+                villager.move()
+                villager.update_animation()  # Köylü animasyonları güncelleniyor
+            
+            # Kurt hareketlerini güncelle
+            for wolf in self.wolves:
+                wolf.move()
+                wolf.update_animation()  # Kurt animasyonlarını burada güncellediğimizden emin olalım
+            
+            # İnşaat alanlarını güncelle
+            self.update_building_sites()
+            
+            # Her bir saniyede bir güncellenen işlemler
+            if current_time - self.last_resource_update > 1.0:
+                self.last_resource_update = current_time
+                
+                # Kaynakları güncelle
+                self.update_resources()
+                
+                # Gündüz/gece döngüsünü güncelle
+                self.update_day_night_cycle()
+            
+            # Her 10 saniyede bir güncellenen işlemler
+            if current_time - self.last_periodic_update > 10.0:
+                self.last_periodic_update = current_time
+                
+                # Çalışma bölgelerini güncelle
+                self.update_work_areas()
+                
+                # Köylü ihtiyaçlarını güncelle
+                self.update_villager_needs()
+            
+        except Exception as e:
+            print(f"HATA: Oyun döngüsü güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc() 

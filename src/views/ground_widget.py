@@ -1,9 +1,10 @@
 from PyQt5.QtWidgets import QWidget
-from PyQt5.QtCore import Qt, QRect, QPoint
+from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
 from PyQt5.QtGui import QPainter, QPixmap, QColor, QTransform, QFont, QPen, QBrush, QPainterPath
 from ..models.villager import Villager, TestVillager
 import random
 import os
+import math
 
 class GroundWidget(QWidget):
     """Zemin widget'ı - Oyun alanını çizen widget"""
@@ -20,18 +21,29 @@ class GroundWidget(QWidget):
         self.game_controller = game_controller
         
         # Zemin yüksekliği - sabit değer
-        self.ground_height = 25
+        self.ground_height = 10
         
         # Çizim yapıldı mı?
         self.is_drawing = False
         
         # Resimleri saklamak için sözlük
         self.images = {
-            "ground": None,
-            "castle": None,
-            "tree": None,
-            "villager": {},
-            "house": {}
+            "tree": {},  # Ağaç resimleri için sözlük
+            "villager": {},  # Köylü resimleri için sözlük
+            "castle": None,  # Kale resmi
+            "ground": None,  # Zemin resmi
+            "building_site": None,  # İnşaat alanı resmi
+            "house": {},  # Ev resimleri için sözlük
+            "cave": None,  # Mağara resmi
+            "pazar1": None,  # Pazar1 resmi
+            "pazar2": None,   # Pazar2 resmi
+            "kilise": None,  # Kilise resmi
+            "gardiyan": None,  # Gardiyan resmi
+            "degirmen": None,  # Değirmen resmi
+            "kuyu": None,  # Kuyu resmi
+            "kurt": None,  # Kurt resmi
+            "kus": None,  # Kuş resmi
+            "karga": None  # Karga resmi
         }
         
         # Resimleri yükle
@@ -42,14 +54,33 @@ class GroundWidget(QWidget):
     def load_images(self):
         """Resimleri yükle"""
         try:
-            # Resim sözlüğü
             self.images = {
-                "ground": None,
-                "castle": None,
-                "tree": None,
-                "villager": {},
-                "house": {}
+                "tree": {},  # Ağaç resimleri için sözlük
+                "villager": {},  # Köylü resimleri için sözlük
+                "castle": None,  # Kale resmi
+                "ground": None,  # Zemin resmi
+                "building_site": None,  # İnşaat alanı resmi
+                "house": {},  # Ev resimleri için sözlük
+                "cave": None,  # Mağara resmi
+                "pazar1": None,  # Pazar1 resmi
+                "pazar2": None,   # Pazar2 resmi
+                "kilise": None,  # Kilise resmi
+                "gardiyan": None,  # Gardiyan resmi
+                "degirmen": None,  # Değirmen resmi
+                "kuyu": None,  # Kuyu resmi
+                "kurt": None,  # Kurt resmi
+                "kus": None,  # Kuş resmi
+                "karga": None  # Karga resmi
             }
+            
+            # Ağaç resimlerini yükle
+            for tree_type in [1, 2, 3]:  # Üç farklı ağaç tipi için
+                tree_path = os.path.join("src", "assets", f"agac{'' if tree_type == 1 else tree_type}.png")
+                if os.path.exists(tree_path):
+                    self.images["tree"][tree_type] = QPixmap(tree_path)
+                    print(f"Ağaç resmi yüklendi: {tree_path}")
+                else:
+                    print(f"UYARI: Ağaç resmi bulunamadı: {tree_path}")
             
             # Zemin resmini yükle
             ground_path = os.path.join("src", "assets", "zemin.png")
@@ -67,13 +98,13 @@ class GroundWidget(QWidget):
             else:
                 print(f"HATA: Kale resmi bulunamadı: {castle_path}")
             
-            # Ağaç resmini yükle
-            tree_path = os.path.join("src", "assets", "agac.png")
-            if os.path.exists(tree_path):
-                self.images["tree"] = QPixmap(tree_path)
-                print(f"Ağaç resmi yüklendi: {tree_path}")
+            # İnşaat alanı resmini yükle
+            building_site_path = os.path.join("src", "assets", "inşaat_alanı.png")
+            if os.path.exists(building_site_path):
+                self.images["building_site"] = QPixmap(building_site_path)
+                print(f"İnşaat alanı resmi yüklendi: {building_site_path}")
             else:
-                print(f"HATA: Ağaç resmi bulunamadı: {tree_path}")
+                print(f"HATA: İnşaat alanı resmi bulunamadı: {building_site_path}")
             
             # Ev resimlerini yükle
             house_types = ["ev1", "ev2", "ev3"]
@@ -94,6 +125,84 @@ class GroundWidget(QWidget):
                         print(f"Köylü resmi yüklendi: {villager_path}")
                     else:
                         print(f"UYARI: Köylü resmi bulunamadı: {villager_path}")
+            
+            # Mağara resmini yükle
+            cave_path = os.path.join("src", "assets", "magara.png")
+            if os.path.exists(cave_path):
+                self.images["cave"] = QPixmap(cave_path)
+                print(f"Mağara resmi yüklendi: {cave_path}")
+            else:
+                print(f"UYARI: Mağara resmi bulunamadı: {cave_path}")
+            
+            # Pazar resimlerini yükle
+            pazar1_path = os.path.join("src", "assets", "Pazar1.png")
+            if os.path.exists(pazar1_path):
+                self.images["pazar1"] = QPixmap(pazar1_path)
+                print(f"Pazar1 resmi yüklendi: {pazar1_path}")
+            else:
+                print(f"UYARI: Pazar1 resmi bulunamadı: {pazar1_path}")
+            
+            pazar2_path = os.path.join("src", "assets", "Pazar2.png")
+            if os.path.exists(pazar2_path):
+                self.images["pazar2"] = QPixmap(pazar2_path)
+                print(f"Pazar2 resmi yüklendi: {pazar2_path}")
+            else:
+                print(f"UYARI: Pazar2 resmi bulunamadı: {pazar2_path}")
+            
+            # Kilise resmini yükle
+            kilise_path = os.path.join("src", "assets", "kilise.png")
+            if os.path.exists(kilise_path):
+                self.images["kilise"] = QPixmap(kilise_path)
+                print(f"Kilise resmi yüklendi: {kilise_path}")
+            else:
+                print(f"UYARI: Kilise resmi bulunamadı: {kilise_path}")
+            
+            # Gardiyan resmini yükle
+            gardiyan_path = os.path.join("src", "assets", "gardiyan.png")
+            if os.path.exists(gardiyan_path):
+                self.images["gardiyan"] = QPixmap(gardiyan_path)
+                print(f"Gardiyan resmi yüklendi: {gardiyan_path}")
+            else:
+                print(f"UYARI: Gardiyan resmi bulunamadı: {gardiyan_path}")
+            
+            # Değirmen resmini yükle
+            degirmen_path = os.path.join("src", "assets", "degirmen.png")
+            if os.path.exists(degirmen_path):
+                self.images["degirmen"] = QPixmap(degirmen_path)
+                print(f"Değirmen resmi yüklendi: {degirmen_path}")
+            else:
+                print(f"UYARI: Değirmen resmi bulunamadı: {degirmen_path}")
+            
+            # Kuyu resmini yükle
+            kuyu_path = os.path.join("src", "assets", "Kuyu.png")
+            if os.path.exists(kuyu_path):
+                self.images["kuyu"] = QPixmap(kuyu_path)
+                print(f"Kuyu resmi yüklendi: {kuyu_path}")
+            else:
+                print(f"UYARI: Kuyu resmi bulunamadı: {kuyu_path}")
+            
+            # Kurt resmini yükle
+            kurt_path = os.path.join("src", "assets", "kurt.png")
+            if os.path.exists(kurt_path):
+                self.images["kurt"] = QPixmap(kurt_path)
+                print(f"Kurt resmi yüklendi: {kurt_path}")
+            else:
+                print(f"UYARI: Kurt resmi bulunamadı: {kurt_path}")
+            
+            # Kuş ve karga resimlerini yükle
+            kus_path = os.path.join("src", "assets", "kus.png")
+            if os.path.exists(kus_path):
+                self.images["kus"] = QPixmap(kus_path)
+                print(f"Kuş resmi yüklendi: {kus_path}")
+            else:
+                print(f"UYARI: Kuş resmi bulunamadı: {kus_path}")
+                
+            karga_path = os.path.join("src", "assets", "karga.png")
+            if os.path.exists(karga_path):
+                self.images["karga"] = QPixmap(karga_path)
+                print(f"Karga resmi yüklendi: {karga_path}")
+            else:
+                print(f"UYARI: Karga resmi bulunamadı: {karga_path}")
             
             print("Resimler yüklendi")
             
@@ -156,47 +265,62 @@ class GroundWidget(QWidget):
     def paintEvent(self, event):
         """Çizim olayı"""
         try:
-            # Çizim zaten yapılıyorsa çıkış yap
+            # Zaten çizim yapılıyorsa, tekrar çizim yapma
             if self.is_drawing:
                 return
                 
-            # Çizim başladı
             self.is_drawing = True
             
             # Painter oluştur
             painter = QPainter(self)
-            painter.setRenderHint(QPainter.Antialiasing)
-            painter.setRenderHint(QPainter.SmoothPixmapTransform)
-            
-            # Arka planı transparan yap
-            painter.fillRect(self.rect(), Qt.transparent)
+            painter.setRenderHint(QPainter.Antialiasing)  # Kenarları yumuşat
             
             # Zemini çiz
             self.draw_ground(painter)
             
+            # Mağarayı çiz
+            self.draw_cave(painter)
+            
             # Kaleyi çiz
             self.draw_castle(painter)
             
-            # Evleri çiz
-            self.draw_houses(painter)
-            
-            # İnşaat alanlarını çiz
-            self.draw_building_sites(painter)
+            # Kiliseyi çiz
+            self.draw_church(painter)
             
             # Ağaçları çiz
             self.draw_trees(painter)
             
+            # Evleri çiz
+            self.draw_houses(painter)
+            
+            # İnşaat alanları çiz
+            self.draw_building_sites(painter)
+            
+            # Pazar yerini çiz
+            self.draw_markets(painter)
+            
+            # Kuyuyu çiz
+            self.draw_well(painter)
+            
+            # Gardiyanı çiz
+            self.draw_guard(painter)
+            
+            # Değirmeni çiz
+            self.draw_mill(painter)
+            
+            # Kuş ve kargaları çiz
+            self.draw_birds(painter)
+            
+            # Kurtları çiz
+            self.draw_wolves(painter)
+            
             # Köylüleri çiz
             self.draw_villagers(painter)
             
-            # Painter'ı kapat
             painter.end()
-            
-            # Çizim bitti
             self.is_drawing = False
             
         except Exception as e:
-            # Çizim bitti (hata durumunda da)
             self.is_drawing = False
             print(f"HATA: Çizim hatası: {e}")
             import traceback
@@ -226,7 +350,7 @@ class GroundWidget(QWidget):
             scaled_ground = self.images["ground"].scaled(new_width, new_height, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
             
             # Zeminin y pozisyonunu hesapla (ekranın en altı)
-            ground_y = self.height() - new_height
+            ground_y = self.height() - new_height + 15
             
             # Ekran genişliğini al
             screen_width = self.width()
@@ -276,33 +400,60 @@ class GroundWidget(QWidget):
             import traceback
             traceback.print_exc()
     
+    def draw_church(self, painter):
+        """Kiliseyi çiz"""
+        try:
+            if not self.images["kilise"]:
+                print("UYARI: Kilise resmi yüklenmemiş")
+                return
+            
+            # Kilise boyutlarını ayarla
+            church_width = 130
+            church_height = 130
+            
+            # Kilise resmini ölçeklendir
+            scaled_church = self.images["kilise"].scaled(church_width, church_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Kalenin konumundan 300 piksel sağda
+            church_x = 300 + 10  # Kale 10 pikselde başlıyor
+            
+            # Y pozisyonunu hesapla (zemin üzerinde)
+            church_y = self.height() - self.ground_height - church_height + 15
+            
+            # Kiliseyi çiz
+            painter.drawPixmap(church_x, church_y, scaled_church)
+            
+            print(f"Kilise çizildi: Konum=({church_x}, {church_y}), Boyut={church_width}x{church_height}")
+            
+        except Exception as e:
+            print(f"HATA: Kilise çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def draw_trees(self, painter):
         """Ağaçları çiz"""
         try:
-            if not self.images["tree"]:
+            if not hasattr(self, 'game_controller') or not self.game_controller:
                 return
                 
-            ground_y = self.height() - self.ground_height
-            
             for tree in self.game_controller.trees:
-                # Sadece görünür ağaçları çiz
                 if not tree.is_visible:
                     continue
                     
-                x = int(tree.x)
-                tree_width = 80
-                tree_height = 120
+                # Ağaç resmini al
+                tree_img = self.images["tree"].get(tree.tree_type)
+                if not tree_img:
+                    # Eğer belirtilen tip için resim yoksa, tip 1'i kullan
+                    tree_img = self.images["tree"].get(1)
+                    if not tree_img:
+                        continue
                 
-                # Ağacın y pozisyonunu köylülerle aynı hizaya getir
-                # Köylü yüksekliği 40 piksel, ağaç yüksekliği 80 piksel
-                # Ağacın alt kısmı zemin seviyesinde olsun
-                y = ground_y - tree_height + 43  # +40 ile ağacı yukarı kaldırıyoruz
-                
-                # Ağaç resmini ölçeklendir
-                scaled_img = self.images["tree"].scaled(tree_width, tree_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                # Ağacın ekrandaki pozisyonu
+                tree_x = int(tree.x - tree.width / 2)
+                tree_y = self.height() - self.ground_height - tree.height + 2 # +2'den +15'e değiştirildi
                 
                 # Ağacı çiz
-                painter.drawPixmap(x - tree_width // 2, y, scaled_img)
+                painter.drawPixmap(tree_x, tree_y, tree.width, tree.height, tree_img)
                 
         except Exception as e:
             print(f"HATA: Ağaç çizme hatası: {e}")
@@ -318,123 +469,110 @@ class GroundWidget(QWidget):
                 return
             
             # Köylüler için görüntü ekranı oluşturmaya hazırlanıyoruz
-            ground_y = self.height() - self.ground_height
+            ground_y = int(self.height() - self.ground_height)
+            
+            if not hasattr(self.game_controller, 'villagers') or not self.game_controller.villagers:
+                print("UYARI: Köylüler listesi bulunamadı veya boş")
+                return
+                
+            print(f"Toplam {len(self.game_controller.villagers)} köylü çizilecek")
 
             for i, villager in enumerate(self.game_controller.villagers):
-                print(f"Köylü çiziliyor: {villager.name}, x={villager.x}, y={villager.y}")
-                
-                # Köylünün ekrandaki pozisyonu
-                x = int(villager.x)
-                y = ground_y - villager.height  # Zemin üzerinde
-                
-                # Köylünün mesleki tipine göre resmi seç
-                if villager.gender == "Erkek":
-                    img_key = f"koylu{villager.appearance}"
-                else:
-                    img_key = f"kadin_koylu{villager.appearance}"
-                
-                img = self.images["villager"].get(img_key)
-                print(f"Köylü resim anahtarı: {img_key}, Resim bulundu: {img is not None}")
-                
-                # Eğer resim bulunamadıysa varsayılan resmi kullan
-                if not img:
-                    default_key = "koylu1" if villager.gender == "Erkek" else "kadin_koylu1"
-                    if default_key in self.images["villager"]:
-                        img = self.images["villager"][default_key]
-                        print(f"Varsayılan resim kullanılıyor: {default_key}")
+                try:
+                    print(f"Köylü çiziliyor: {villager.name}, x={villager.x}, y={villager.y}")
+                    
+                    # Köylünün ekrandaki pozisyonu - tam sayı olarak
+                    x = int(villager.x)
+                    y = int(ground_y - villager.height)  # Zemin üzerinde
+                    
+                    # Köylünün mesleki tipine göre resmi seç
+                    if villager.gender == "Erkek":
+                        img_key = f"koylu{villager.appearance}"
                     else:
-                        # Hiç resim yoksa çizme
-                        print(f"HATA: Köylü için resim bulunamadı: {villager.name}")
-                        continue
-                
-                # Köylü resmini ölçeklendir
-                scaled_img = img.scaled(villager.width, villager.height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                
-                # Köylü hareket yönüne göre resmi çevir
-                if hasattr(villager, 'direction_x') and villager.direction_x < 0:  # Sola gidiyorsa
-                    transform = QTransform().scale(-1, 1)  # Yatay eksende çevir
-                    scaled_img = scaled_img.transformed(transform)
-                
-                # Eğilme animasyonunu uygula
-                if hasattr(villager, 'rotation') and villager.rotation != 0:
-                    transform = QTransform()
-                    transform.rotate(villager.rotation)
-                    scaled_img = scaled_img.transformed(transform)
-                
-                # Köylüyü çiz
-                painter.drawPixmap(x, y, scaled_img)
-                print(f"Köylü çizildi: {villager.name}, konum: ({x}, {y})")
-                
-                # Yazı alanı genişliği (köylü genişliğinin 2 katı)
-                text_width = villager.width * 2
-                text_x = x - (text_width - villager.width) // 2  # Merkezle
-                
-                # Köylü ismini çiz
-                painter.setPen(Qt.white)
-                painter.setFont(QFont("Arial", 8))
-                painter.drawText(
-                    text_x, y - 15, text_width, 15,
-                    Qt.AlignCenter, villager.name
-                )
-                
-                # Köylü durumunu çiz
-                if hasattr(villager, 'state') and villager.state:
-                    # Durum yazısı için arka plan çiz
-                    state_rect = QRect(text_x, y - 30, text_width, 15)
-                    painter.fillRect(state_rect, QColor(0, 0, 0, 128))  # Yarı saydam siyah arka plan
+                        img_key = f"kadin_koylu{villager.appearance}"
                     
-                    painter.setPen(Qt.yellow)
-                    painter.drawText(
-                        state_rect,
-                        Qt.AlignCenter, villager.state
-                    )
-                else:
-                    # Mesleğini göster
-                    profession_rect = QRect(text_x, y - 30, text_width, 15)
-                    painter.fillRect(profession_rect, QColor(0, 0, 0, 128))  # Yarı saydam siyah arka plan
+                    img = self.images["villager"].get(img_key)
+                    print(f"Köylü resim anahtarı: {img_key}, Resim bulundu: {img is not None}")
                     
-                    painter.setPen(Qt.yellow)
+                    # Eğer resim bulunamadıysa varsayılan resmi kullan
+                    if not img:
+                        default_key = "koylu1" if villager.gender == "Erkek" else "kadin_koylu1"
+                        if default_key in self.images["villager"]:
+                            img = self.images["villager"][default_key]
+                            print(f"Varsayılan resim kullanılıyor: {default_key}")
+                        else:
+                            # Hiç resim yoksa çizme
+                            print(f"HATA: Köylü için resim bulunamadı: {villager.name}")
+                            continue
+                    
+                    # Köylü resmini ölçeklendir - tam sayı boyutlarıyla
+                    villager_width = int(villager.width)
+                    villager_height = int(villager.height)
+                    scaled_img = img.scaled(villager_width, villager_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    
+                    # Köylü hareket yönüne göre resmi çevir
+                    if hasattr(villager, 'direction_x') and villager.direction_x < 0:  # Sola gidiyorsa
+                        transform = QTransform().scale(-1, 1)  # Yatay eksende çevir
+                        scaled_img = scaled_img.transformed(transform)
+                    
+                    # Eğilme animasyonunu uygula
+                    if hasattr(villager, 'rotation') and villager.rotation != 0:
+                        transform = QTransform()
+                        transform.rotate(villager.rotation)
+                        scaled_img = scaled_img.transformed(transform)
+                    
+                    # Köylüyü çiz
+                    painter.drawPixmap(x, y, scaled_img)
+                    print(f"Köylü çizildi: {villager.name}, konum: ({x}, {y})")
+                    
+                    # Konuşma baloncuğunu çiz - eğer köylü konuşuyorsa
+                    if hasattr(villager, 'chat_message') and villager.chat_message:
+                        print(f"Köylü konuşuyor: {villager.name}, mesaj: {villager.chat_message}")
+                        self.draw_chat_bubble(painter, villager, x + villager_width // 2, y)
+                    
+                    # Yazı alanı genişliği (köylü genişliğinin 2 katı)
+                    text_width = int(villager_width * 2)
+                    text_x = int(x - (text_width - villager_width) // 2)  # Merkezle
+                    
+                    # Köylü ismini çiz
+                    painter.setPen(Qt.white)
+                    painter.setFont(QFont("Arial", 8))
                     painter.drawText(
-                        profession_rect,
-                        Qt.AlignCenter, villager.profession
+                        text_x, y - 15, text_width, 15,
+                        Qt.AlignCenter, villager.name
                     )
-                
-                # Diyalog baloncuğunu çiz
-                if hasattr(villager, 'chat_bubble_visible') and villager.chat_bubble_visible and hasattr(villager, 'chat_message') and villager.chat_message:
-                    self.draw_chat_bubble(painter, villager, x, y)
-                
-                # Köylü taşıdığı kaynakları çiz
-                if hasattr(villager, 'carrying') and villager.carrying:
-                    resource_text = f"{villager.carrying['type']}: {villager.carrying['amount']}"
-                    painter.setPen(Qt.cyan)
-                    painter.drawText(
-                        text_x, y + villager.height + 5, text_width, 15,
-                        Qt.AlignCenter, resource_text
-                    )
-                
-                # Köylünün parasını göster
-                if hasattr(villager, 'money'):
-                    money_text = f"{villager.money} altın"
-                    painter.setPen(Qt.green)
-                    painter.drawText(
-                        text_x, y + villager.height + 20, text_width, 15,
-                        Qt.AlignCenter, money_text
-                    )
-                
-                # Ev sahibi olma durumunu göster
-                if hasattr(villager, 'has_house') and villager.has_house:
-                    house_text = "Ev Sahibi"
-                    painter.setPen(QColor(255, 165, 0))  # Turuncu
-                    painter.drawText(
-                        text_x, y + villager.height + 35, text_width, 15,
-                        Qt.AlignCenter, house_text
-                    )
-                
+                    
+                    # Köylü durumunu çiz
+                    if hasattr(villager, 'state') and villager.state:
+                        # Durum yazısı için arka plan çiz
+                        state_rect = QRect(text_x, y - 30, text_width, 15)
+                        painter.fillRect(state_rect, QColor(0, 0, 0, 128))  # Yarı saydam siyah arka plan
+                        
+                        painter.setPen(Qt.yellow)
+                        painter.drawText(
+                            state_rect,
+                            Qt.AlignCenter, villager.state
+                        )
+                    else:
+                        # Mesleğini göster
+                        profession_rect = QRect(text_x, y - 30, text_width, 15)
+                        painter.fillRect(profession_rect, QColor(0, 0, 0, 128))  # Yarı saydam siyah arka plan
+                        
+                        painter.setPen(Qt.yellow)
+                        painter.drawText(
+                            profession_rect,
+                            Qt.AlignCenter, villager.profession
+                        )
+                except Exception as e:
+                    print(f"HATA: Köylü çizme hatası ({villager.name}): {e}")
+                    import traceback
+                    traceback.print_exc()
+        
         except Exception as e:
             print(f"HATA: Köylü çizim hatası: {e}")
             import traceback
             traceback.print_exc()
-        
+    
     def draw_chat_bubble(self, painter, villager, x, y):
         """Diyalog baloncuğunu çiz"""
         try:
@@ -724,3 +862,383 @@ class GroundWidget(QWidget):
             print(f"HATA: İnşaat alanı çizim hatası: {e}")
             import traceback
             traceback.print_exc() 
+    
+    def draw_cave(self, painter):
+        """Mağarayı çiz"""
+        try:
+            if not self.images["cave"]:
+                print("UYARI: Mağara resmi yüklenmemiş")
+                return
+                
+            # Mağara boyutlarını ağaçlarla aynı boyuta getir
+            cave_width = 100  # Ağaç genişliği ile aynı
+            cave_height = 70  # Ağaç yüksekliği ile aynı
+            
+            # Mağara resmini ölçeklendir
+            scaled_cave = self.images["cave"].scaled(cave_width, cave_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Mağarayı ekranın en sağına yerleştir
+            cave_x = self.width() - cave_width + 30  # En sağ kenara
+            cave_y = self.height() - self.ground_height - cave_height + 15  # Ağaçlarla aynı hizada
+            
+            # Mağarayı çiz
+            painter.drawPixmap(cave_x, cave_y, scaled_cave)
+            
+            print(f"Mağara çizildi: Konum=({cave_x}, {cave_y}), Boyut={cave_width}x{cave_height}")
+            
+        except Exception as e:
+            print(f"HATA: Mağara çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def draw_markets(self, painter):
+        """Pazar yerlerini çiz"""
+        try:
+            if not self.images["pazar1"] or not self.images["pazar2"]:
+                print("UYARI: Pazar resimleri yüklenememiş")
+                return
+            
+            # Pazar boyutlarını ayarla
+            market_width = 65
+            market_height = 65
+            
+            # Pazar resimlerini ölçeklendir
+            scaled_pazar1 = self.images["pazar1"].scaled(market_width, market_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            scaled_pazar2 = self.images["pazar2"].scaled(market_width, market_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Kalenin konumundan 300 piksel sağda başla
+            base_x = 600 + 10  # Kale 10 pikselde başlıyor
+            
+            # Y pozisyonunu hesapla (zemin üzerinde)
+            market_y = self.height() - self.ground_height - market_height + 11
+            
+            # Pazar1'i çiz
+            painter.drawPixmap(base_x, market_y, scaled_pazar1)
+            
+            # Pazar2'yi çiz (10 piksel sağda)
+            painter.drawPixmap(base_x + market_width + 10, market_y, scaled_pazar2)
+            
+            print(f"Pazarlar çizildi: Pazar1=({base_x}, {market_y}), Pazar2=({base_x + market_width + 10}, {market_y})")
+            
+        except Exception as e:
+            print(f"HATA: Pazar çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def draw_guard(self, painter):
+        """Gardiyanı çiz"""
+        try:
+            if not self.images["gardiyan"]:
+                print("UYARI: Gardiyan resmi yüklenmemiş")
+                return
+            
+            # Gardiyan boyutlarını ayarla
+            guard_width = 100
+            guard_height = 100
+            
+            # Gardiyan resmini ölçeklendir
+            scaled_guard = self.images["gardiyan"].scaled(guard_width, guard_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Kalenin konumundan 900 piksel sağda
+            guard_x = 900 + 10  # Kale 10 pikselde başlıyor
+            
+            # Y pozisyonunu hesapla (zemin üzerinde)
+            guard_y = self.height() - self.ground_height - guard_height + 5
+            
+            # Gardiyanı çiz
+            painter.drawPixmap(guard_x, guard_y, scaled_guard)
+            
+            print(f"Gardiyan çizildi: Konum=({guard_x}, {guard_y}), Boyut={guard_width}x{guard_height}")
+            
+        except Exception as e:
+            print(f"HATA: Gardiyan çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def draw_mill(self, painter):
+        """Değirmeni çiz"""
+        try:
+            if not self.images["degirmen"]:
+                print("UYARI: Değirmen resmi yüklenmemiş")
+                return
+            
+            # Değirmen boyutlarını ayarla
+            mill_width = 110
+            mill_height = 110
+            
+            # Değirmen resmini ölçeklendir
+            scaled_mill = self.images["degirmen"].scaled(mill_width, mill_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Kalenin konumundan 1500 piksel sağda
+            mill_x = 1500 + 10  # Kale 10 pikselde başlıyor
+            
+            # Y pozisyonunu hesapla (zemin üzerinde)
+            mill_y = self.height() - self.ground_height - mill_height + 1
+            
+            # Değirmeni çiz
+            painter.drawPixmap(mill_x, mill_y, scaled_mill)
+            
+            print(f"Değirmen çizildi: Konum=({mill_x}, {mill_y}), Boyut={mill_width}x{mill_height}")
+            
+        except Exception as e:
+            print(f"HATA: Değirmen çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_well(self, painter):
+        """Kuyuyu çiz"""
+        try:
+            if not self.images["kuyu"]:
+                print("UYARI: Kuyu resmi yüklenmemiş")
+                return
+            
+            # Kuyu boyutlarını ayarla
+            well_width = 45
+            well_height = 45
+            
+            # Kuyu resmini ölçeklendir
+            scaled_well = self.images["kuyu"].scaled(well_width, well_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Pazar2'nin konumundan 100 piksel sağda
+            # Pazarların konumu: base_x = 600 + 10
+            # Pazar2'nin konumu: base_x + market_width + 10 = 610 + 65 + 10 = 685
+            well_x = 685 + 90  # Pazar2'nin konumu + 100 piksel
+            
+            # Y pozisyonunu hesapla (zemin üzerinde)
+            well_y = self.height() - self.ground_height - well_height + 7
+            
+            # Kuyuyu çiz
+            painter.drawPixmap(well_x, well_y, scaled_well)
+            
+            print(f"Kuyu çizildi: Konum=({well_x}, {well_y}), Boyut={well_width}x{well_height}")
+            
+        except Exception as e:
+            print(f"HATA: Kuyu çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_wolves(self, painter):
+        """Kurtları çiz - köylülere benzer şekilde"""
+        try:
+            # Game controller kontrolü
+            if not hasattr(self, 'game_controller') or not self.game_controller:
+                print("UYARI: draw_wolves - game_controller bulunamadı")
+                return
+                
+            # Kurt resmi yüklü değilse çıkış yap
+            if not self.images.get("kurt"):
+                print("UYARI: Kurt resmi yüklenmemiş")
+                return
+                
+            # Kurtlar listesi kontrolü
+            if not hasattr(self.game_controller, 'wolves') or not self.game_controller.wolves:
+                print("UYARI: draw_wolves - wolves listesi bulunamadı veya boş")
+                return
+            
+            print(f"Kurtlar çiziliyor... {len(self.game_controller.wolves)} kurt var")
+            
+            # Tüm kurtları çiz
+            for i, wolf in enumerate(self.game_controller.wolves):
+                try:
+                    # Kurt varlığını görselleştir
+                    wolf_pixmap = self.images["kurt"]
+                    
+                    # Kurdun X ve Y pozisyonunu ayarla
+                    x = int(wolf.x)
+                    
+                    # Debug yazdır
+                    print(f"Kurt çiziliyor: #{wolf.wolf_id}, pozisyon: ({x}, {wolf.y})")
+                    
+                    # Int değerlerle çalış
+                    wolf_width = int(wolf.width)
+                    wolf_height = int(wolf.height)
+                    
+                    # Eğilme özelliği için kurdun Y pozisyonunu hesapla
+                    # Çömelme durumu varsa buna göre ayarla
+                    if hasattr(wolf, 'is_crouching') and wolf.is_crouching:
+                        crouch_offset = int(wolf.crouch_frame * 1.5)
+                        scaled_wolf = wolf_pixmap.scaled(wolf_width, wolf_height - crouch_offset, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        wolf_y = int(self.height() - self.ground_height - (wolf_height - crouch_offset))
+                    else:
+                        # Sabit Y pozisyonu - zıplama yok
+                        scaled_wolf = wolf_pixmap.scaled(wolf_width, wolf_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        wolf_y = int(self.height() - self.ground_height - wolf_height)
+                    
+                    # Kurt hareket yönüne göre görseli çevir
+                    if hasattr(wolf, 'direction_x') and wolf.direction_x > 0:  # Sağa gidiyorsa resmi çevir
+                        # Görüntüyü çevir - QTransform kullan
+                        transform = QTransform().scale(-1, 1)
+                        scaled_wolf = scaled_wolf.transformed(transform)
+                    
+                    # Eğilme animasyonunu uygula
+                    if hasattr(wolf, 'rotation') and wolf.rotation != 0:
+                        transform = QTransform()
+                        # Dönüşüm merkezini ayarla - tam sayıya dönüştür
+                        transform.translate(int(scaled_wolf.width() / 2), int(scaled_wolf.height()))
+                        transform.rotate(wolf.rotation)
+                        transform.translate(-int(scaled_wolf.width() / 2), -int(scaled_wolf.height()))
+                        scaled_wolf = scaled_wolf.transformed(transform)
+                    
+                    # Kurdu çiz - tüm değerleri int olarak dönüştür
+                    draw_x = int(x - scaled_wolf.width() // 2)
+                    draw_y = int(wolf_y)
+                    painter.drawPixmap(draw_x, draw_y, scaled_wolf)
+                    
+                    # Kurt durumunu göster
+                    if hasattr(wolf, 'state') and wolf.state:
+                        painter.setPen(Qt.white)
+                        text_width = int(wolf_width * 2)
+                        text_x = int(x - text_width // 2)
+                        text_y = int(wolf_y - 15)
+                        painter.drawText(text_x, text_y, text_width, 15, Qt.AlignCenter, wolf.state)
+                    
+                    print(f"Kurt başarıyla çizildi: #{wolf.wolf_id}")
+                    
+                except Exception as e:
+                    print(f"HATA: Kurt çizme hatası: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+        except Exception as e:
+            print(f"HATA: Kurtları çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_birds(self, painter):
+        """Kuş ve kargaları çiz"""
+        try:
+            # Game controller kontrolü
+            if not hasattr(self, 'game_controller') or not self.game_controller:
+                print("UYARI: draw_birds - game_controller bulunamadı")
+                return
+                
+            # Kuşlar listesi kontrolü
+            if not hasattr(self.game_controller, 'birds') or not self.game_controller.birds:
+                return
+                
+            print(f"Kuşlar çiziliyor... {len(self.game_controller.birds)} kuş var")
+            
+            # Ağaç yüksekliği ve zemin seviyesi bilgilerini hesapla
+            ground_y = self.height() - self.ground_height
+            tree_height = 80  # Varsayılan ağaç yüksekliği
+            tree_top_y = ground_y - tree_height  # Ağacın tepesinin y koordinatı
+            
+            # Kuşların uçabileceği minimum ve maksimum yükseklikler
+            min_flight_y = tree_top_y  # Minimum uçuş yüksekliği (ağaç tepesi)
+            max_flight_y = tree_top_y - 100  # Maksimum uçuş yüksekliği (ağaç tepesinden 100px yukarı)
+                
+            # Tüm kuşları çiz
+            for bird in self.game_controller.birds:
+                try:
+                    # Kuş tipine göre resmi seç
+                    bird_pixmap = self.images.get(bird.bird_type)
+                    
+                    if not bird_pixmap:
+                        print(f"UYARI: {bird.bird_type} resmi bulunamadı")
+                        continue
+                    
+                    # Kuş boyutları (daha küçük boyutlar)
+                    bird_width = int(bird.width * 0.6)  # %60 daha küçük
+                    bird_height = int(bird.height * 0.6)  # %60 daha küçük
+                    
+                    # Kuşun X ve Y pozisyonunu ayarla - tam sayı olarak
+                    x = int(bird.x)
+                    y = int(bird.y)
+                    
+                    # Uçuş animasyonu için yükseklik kontrolü
+                    if hasattr(bird, 'is_taking_off') and bird.is_taking_off:
+                        # Ağaçtan yükselme animasyonu - ağacın konumundan başla
+                        source_tree_x = bird.source_tree_x
+                        
+                        # Animasyon ilerleme kontrolü - kaynak ağaca yakın ise
+                        distance_from_source = abs(x - source_tree_x)
+                        if distance_from_source < 50:
+                            # Kuşun kanat çırpma animasyonunu hızlandır
+                            bird.wing_cycle_speed = 12.0
+                            
+                            # Kuşun uçuş yüksekliğini kademeli olarak artır
+                            flight_progress = min(1.0, distance_from_source / 50.0)
+                            
+                            # Ağacın tepesinden hedef yüksekliğe yükselme (yukarı doğru) - sınırlı yükseklik
+                            smooth_progress = flight_progress * flight_progress  # Easing fonksiyonu
+                            max_altitude_gain = min(100, tree_top_y - max_flight_y)  # En fazla 100px yükselme
+                            
+                            # Yukarı doğru yükselme - kısıtlı bir alanda
+                            altitude_gain = max_altitude_gain * smooth_progress
+                            y = int(tree_top_y - altitude_gain)
+                            
+                            # Animasyon debug bilgisi
+                            print(f"Kuş yükseliyor: #{bird.bird_id}, ilerleme: {smooth_progress:.2f}, ağaç_tepe_y: {tree_top_y}, y: {y}")
+                            
+                            # Bird nesnesinin y koordinatını güncelle (game_controller'da kullanılabilmesi için)
+                            bird.y = y
+                    else:
+                        # Normal uçuş - kuş.y değerini kullan, ancak yükseklik sınırlarına dikkat et
+                        # Kuş çok yükseğe çıkmışsa sınırla
+                        if y < max_flight_y:
+                            y = max_flight_y
+                            bird.y = float(y)
+                            
+                        # Kuş ağaç seviyesi altındaysa sınırla
+                        elif y > min_flight_y:
+                            y = min_flight_y
+                            bird.y = float(y)
+                    
+                    # Debug yazdır
+                    print(f"Kuş çiziliyor: {bird.bird_type} #{bird.bird_id}, pozisyon: ({x}, {y})")
+                    
+                    # Kuş resmini ölçeklendir
+                    scaled_bird = bird_pixmap.scaled(bird_width, bird_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    
+                    # Kuş hareket yönüne göre görseli çevir
+                    if bird.direction_x < 0:  # Sola gidiyorsa
+                        # Görüntüyü çevir - QTransform kullan
+                        mirror_transform = QTransform().scale(-1, 1)
+                        scaled_bird = scaled_bird.transformed(mirror_transform)
+                    
+                    # Kanat çırpma animasyonu (geliştirilmiş)
+                    if hasattr(bird, 'wing_angle') and bird.wing_angle != 0:
+                        # Yeni yöntem: Kanatları döndürmek yerine kuşun gövdesini hafifçe eğ
+                        # Kanat açısına göre uçuş yönü eğimi
+                        flight_tilt = bird.wing_angle * 0.2  # Daha az eğim
+                        transform = QTransform()
+                        transform.rotate(flight_tilt)
+                        scaled_bird = scaled_bird.transformed(transform)
+                        
+                        # Ek olarak, kanat çırpma döngüsü pozisyonuna göre hafif dikey hareket ekle
+                        if hasattr(bird, 'wing_cycle_position'):
+                            # Sinüs dalgasıyla yumuşak bir yukarı-aşağı hareketi
+                            vertical_offset = math.sin(bird.wing_cycle_position * 2 * math.pi) * 2
+                            y += int(vertical_offset)
+                    
+                    # Kuşu çiz - tüm değerleri int olarak dönüştür
+                    draw_x = int(x - scaled_bird.width() // 2)
+                    draw_y = int(y)
+                    painter.drawPixmap(draw_x, draw_y, scaled_bird)
+                    
+                    # Debug: Kuş durumunu göster (istenirse bu kısım kaldırılabilir)
+                    if hasattr(bird, 'state') and bird.state and bird.state != "Uçuyor":
+                        # Sadece özel durumlar için etiket göster
+                        painter.setPen(Qt.white)
+                        text_width = int(bird_width * 2)
+                        text_x = int(x - text_width // 2)
+                        text_y = int(y - 15)
+                        
+                        # Yarı-saydam arka plan
+                        text_rect = QRect(text_x, text_y, text_width, 15)
+                        painter.fillRect(text_rect, QColor(0, 0, 0, 100))
+                        
+                        # Metni çiz
+                        painter.drawText(text_x, text_y, text_width, 15, Qt.AlignCenter, bird.state)
+                    
+                    print(f"Kuş başarıyla çizildi: {bird.bird_type} #{bird.bird_id}")
+                    
+                except Exception as e:
+                    print(f"HATA: Kuş çizme hatası: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+        except Exception as e:
+            print(f"HATA: Kuşları çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()

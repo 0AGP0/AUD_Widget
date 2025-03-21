@@ -3,6 +3,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 import time
 import math
 import random
+import os
 
 @dataclass
 class Tree:
@@ -17,20 +18,40 @@ class Tree(QObject):
     woodcutter_finished = pyqtSignal(object)
     tree_removed = pyqtSignal(object)
     
-    def __init__(self, x: float, y: float, width: int, height: int):
+    # Sınıf değişkeni olarak ID sayacı
+    next_id = 1
+    
+    def __init__(self, x: float, y: float, width: int, height: int, tree_type: int = 1):
         super().__init__()
         self.x = x
         self.original_x = x
         self.y = y
         self.width = width
         self.height = height
+        self.tree_type = tree_type  # 1: normal ağaç, 2: alternatif ağaç
+        self.id = Tree.next_id
+        Tree.next_id += 1
         self.health = 10  # Ağaç canı 10 olarak ayarlandı
         self.is_visible = True
         self.is_being_cut = False
         self.current_woodcutter = None
-        self.id = id(self)
-        self.shake_offset = 0
+        self.cut_progress = 0
+        self.cut_start_time = 0
+        self.cut_duration = 5.0  # 5 saniye
         
+        # Animasyon için değişkenler
+        self.sway_offset = 0.0
+        self.sway_direction = 1
+        self.sway_speed = random.uniform(0.02, 0.05)
+        self.max_sway = random.uniform(1.0, 2.0)
+        
+        # Rüzgar efekti için başlangıç zamanı
+        self.start_time = time.time()
+    
+    def get_image_name(self) -> str:
+        """Ağaç görüntüsünün dosya adını döndür"""
+        return f"agac{'2' if self.tree_type == 2 else ''}.png"
+    
     def start_cutting(self, woodcutter) -> bool:
         """Ağaç kesme işlemini başlat"""
         if not self.is_visible or self.is_being_cut:
@@ -109,11 +130,11 @@ class Tree(QObject):
             current_time = time.time()
             # Her saniye yön değiştir (1 saniye sağa, 1 saniye sola)
             direction = 1 if int(current_time) % 2 == 0 else -1
-            self.shake_offset = 5 * direction  # 5 piksel sabit sallanma
-            self.x = self.original_x + self.shake_offset
+            self.sway_offset = 5 * direction  # 5 piksel sabit sallanma
+            self.x = self.original_x + self.sway_offset
         else:
             self.x = self.original_x
-            self.shake_offset = 0
+            self.sway_offset = 0
     
     def respawn(self):
         """Ağacı yeniden doğur"""
@@ -123,7 +144,7 @@ class Tree(QObject):
             self.is_being_cut = False
             self.current_woodcutter = None
             self.x = self.original_x
-            self.shake_offset = 0
+            self.sway_offset = 0
             print(f"Ağaç {self.id} yeniden doğdu!")
 
     def on_cut_finished(self):
