@@ -15,6 +15,7 @@ from ..models.building_site import BuildingSite
 from ..models.house import House
 from ..models.wolf import Wolf
 from ..models.bird import Bird
+from ..models.market import Market, MarketStall
 from ..models.ai.dialogue.dialogue_manager import DialogueManager
 from ..utils.constants import MALE_NAMES, FEMALE_NAMES, PROFESSIONS
 
@@ -23,6 +24,7 @@ class GameController(QObject):
     villagers_updated = pyqtSignal(list)  # Köylü listesi güncellendiğinde sinyal gönder
     day_night_changed = pyqtSignal(bool)  # Gece/gündüz değiştiğinde sinyal gönder (True = Gündüz)
     chat_message = pyqtSignal(object, str)  # Köylü ve mesaj sinyali
+    trade_completed = pyqtSignal(object, object, str, int, int)  # Ticaret tamamlandığında sinyal gönder
     
     DAY_DURATION = 300  # 5 dakika (saniye cinsinden)
     NIGHT_DURATION = 180  # 3 dakika (saniye cinsinden)
@@ -41,6 +43,7 @@ class GameController(QObject):
         self.structures = []     # Yapılar
         self.building_sites = [] # İnşaat alanları
         self.houses = []         # Evler
+        self.market = None       # Pazar alanı
         
         # Gece/Gündüz sistemi için değişkenler
         self.is_daytime = True  # True = Gündüz, False = Gece
@@ -131,6 +134,11 @@ class GameController(QObject):
             self.castle.add_to_inventory("odun", 0)
             print("Kale envanterine 0 odun eklendi")
             
+            # Pazar alanını oluştur
+            print("Pazar alanı oluşturuluyor...")
+            self.create_market()
+            print("Pazar alanı oluşturuldu")
+            
             # Mağarayı oluştur
             print("Mağara oluşturuluyor...")
             self.create_cave()
@@ -149,7 +157,6 @@ class GameController(QObject):
             # Kurtları oluştur
             print("Kurtlar oluşturuluyor...")
             self.create_wolves()
-            print(f"{len(self.wolves)} kurt oluşturuldu")
             
             # Kontrol panelini güncelle
             print("Kontrol paneli güncelleniyor...")
@@ -167,7 +174,7 @@ class GameController(QObject):
             print("Oyun güncelleme zamanlayıcısı başlatılıyor...")
             self.timer = QTimer()
             self.timer.timeout.connect(self.update_game)
-            self.timer.start(16)  # ~60 FPS
+            self.timer.start(8)  # ~120 FPS (16ms -> 8ms)
             
             print("Oyun kurulumu tamamlandı")
             
@@ -528,36 +535,46 @@ class GameController(QObject):
             return None
     
     def update_game(self):
-        """Oyun durumunu güncelle"""
+        """Oyun döngüsünü güncelle"""
         try:
+            current_time = time.time()
+            time_since_last_update = current_time - self.last_periodic_update
+            
+            # Her 30 saniyede bir rastgele yeni ağaç ekle (eskisi kaldırılmışsa)
+            if current_time - self.last_resource_update > 30.0:
+                self.add_new_tree()
+                self.last_resource_update = current_time
+            
+            # Her çağrıda köylü ve kurt hareketlerini güncelle (periyodik değil)
             # Köylüleri güncelle
             for villager in self.villagers:
-                # Davranış ağacı ile güncelleme
-                if hasattr(villager, 'update_behavior_tree'):
-                    villager.update_behavior_tree()
-                else:
-                    # Eski hareket sistemi
+                if hasattr(villager, 'move'):
                     villager.move()
+                if hasattr(villager, 'update_animation'):
                     villager.update_animation()
             
             # Kurtları güncelle
             for wolf in self.wolves:
-                wolf.move()
-                wolf.update_animation()
-            
-            # Kuşları güncelle
+                wolf.update()
+                
+            # Kuşları güncelle - her frame'de
             self.update_birds()
             
-            # Ağaç animasyonlarını güncelle
-            for tree in self.trees:
-                tree.update_animation()
-            
-            # Köylü listesi güncellendiğinde sinyal gönder
-            self.villagers_updated.emit(self.villagers)
-            
-            # Oyun penceresini güncelle
-            if hasattr(self, 'window'):
-                self.window.update()
+            # Periyodik güncellemeler (her saniye)
+            if time_since_last_update >= 0.5:  # 1.0 yerine 0.5 saniye
+                # Köylülerin davranış ağaçlarını güncelle
+                for villager in self.villagers:
+                    if hasattr(villager, 'update_behavior_tree'):
+                        villager.update_behavior_tree()
+                
+                # Pazar tezgahlarını kontrol et
+                if self.market:
+                    for stall in self.market.stalls:
+                        # Zaman aşımına uğrayan tezgahları serbest bırak
+                        if stall.is_active and stall.owner and stall.owner.last_trade_time + 30.0 < current_time:
+                            stall.owner.release_market_stall()
+                
+                self.last_periodic_update = current_time
                 
         except Exception as e:
             print(f"HATA: Oyun güncelleme hatası: {e}")
@@ -1265,6 +1282,48 @@ class GameController(QObject):
             traceback.print_exc()
             return None
 
+    def create_market(self):
+        """Köy pazarını oluştur"""
+        try:
+            # Kalenin konumuna göre pazar yerini belirle
+            castle_x = self.castle.x if hasattr(self, 'castle') and self.castle else 500
+            market_x = castle_x + 400  # Kaleden 400 piksel sağda
+            
+            # Pazar yapısı için y değeri - ground_y kullan, kilise benzeri konumlandırma
+            market_y = self.ground_y  # Zemin seviyesi
+            
+            # Market nesnesini oluştur
+            from src.models.market import Market
+            self.market = Market(market_x, market_y, 4)  # 4 tezgahlı pazar
+            
+            # Pazar sinyallerini bağla
+            self.market.transaction_completed.connect(self.on_trade_completed)
+            
+            # Başarılı oluşturma bildirimi
+            print(f"Pazar alanı oluşturuldu. Konum: ({market_x}, {market_y})")
+            self.notify("Köy pazarı kuruldu!", "trade")
+
+            return self.market
+        except Exception as e:
+            print(f"Pazar oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def on_trade_completed(self, seller, buyer, product, amount, price):
+        """Ticaret tamamlandığında çağrılır"""
+        # İlgili köylülere durumu bildir
+        seller_msg = f"{buyer.name} ile {amount} {product} için {price} altına ticaret yaptı."
+        buyer_msg = f"{seller.name}'den {amount} {product} satın aldı, {price} altın ödedi."
+        
+        self.create_dialogue_bubble(seller, seller_msg)
+        self.create_dialogue_bubble(buyer, buyer_msg)
+        
+        # Tüm bileşenlerin trade_completed sinyalini duyması için ilet
+        self.trade_completed.emit(seller, buyer, product, amount, price)
+        
+        print(f"Ticaret tamamlandı: {seller.name} -> {buyer.name}, {amount} {product}, {price} altın")
+        
     def update_game_loop(self):
         """Oyun döngüsünü güncelle"""
         try:

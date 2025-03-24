@@ -264,67 +264,63 @@ class GroundWidget(QWidget):
         
     def paintEvent(self, event):
         """Çizim olayı"""
-        try:
-            # Zaten çizim yapılıyorsa, tekrar çizim yapma
-            if self.is_drawing:
-                return
-                
-            self.is_drawing = True
+        if self.is_drawing:
+            return
             
-            # Painter oluştur
+        self.is_drawing = True
+        
+        try:
             painter = QPainter(self)
-            painter.setRenderHint(QPainter.Antialiasing)  # Kenarları yumuşat
+            painter.setRenderHint(QPainter.Antialiasing)  # Kenar yumuşatma
             
             # Zemini çiz
             self.draw_ground(painter)
             
-            # Mağarayı çiz
-            self.draw_cave(painter)
-            
             # Kaleyi çiz
             self.draw_castle(painter)
+            
+            # Mağarayı çiz
+            self.draw_cave(painter)
             
             # Kiliseyi çiz
             self.draw_church(painter)
             
-            # Ağaçları çiz
-            self.draw_trees(painter)
+            # Pazar yerini çiz - Kaleden sonra, köylüler ve yapılardan önce
+            self.draw_markets(painter)
+            
+            # Gardiyanı çiz - artık aktif
+            self.draw_guard(painter)
+            
+            # Diğer yapıları ekleyin
+            # self.draw_mill(painter)
+            # self.draw_well(painter)
             
             # Evleri çiz
             self.draw_houses(painter)
             
-            # İnşaat alanları çiz
+            # İnşaat alanlarını çiz
             self.draw_building_sites(painter)
             
-            # Pazar yerini çiz
-            self.draw_markets(painter)
-            
-            # Kuyuyu çiz
-            self.draw_well(painter)
-            
-            # Gardiyanı çiz
-            self.draw_guard(painter)
-            
-            # Değirmeni çiz
-            self.draw_mill(painter)
-            
-            # Kuş ve kargaları çiz
-            self.draw_birds(painter)
+            # Ağaçları çiz
+            self.draw_trees(painter)
             
             # Kurtları çiz
             self.draw_wolves(painter)
             
-            # Köylüleri çiz
+            # Kuşları çiz
+            self.draw_birds(painter)
+            
+            # Köylüleri çiz - en üstte olmalı
             self.draw_villagers(painter)
             
             painter.end()
-            self.is_drawing = False
             
         except Exception as e:
-            self.is_drawing = False
-            print(f"HATA: Çizim hatası: {e}")
+            print(f"HATA: paintEvent: {e}")
             import traceback
             traceback.print_exc()
+            
+        self.is_drawing = False
     
     def draw_ground(self, painter):
         """Zemini çiz"""
@@ -892,33 +888,133 @@ class GroundWidget(QWidget):
             traceback.print_exc()
     
     def draw_markets(self, painter):
-        """Pazar yerlerini çiz"""
+        """Pazar alanlarını çiz"""
         try:
-            if not self.images["pazar1"] or not self.images["pazar2"]:
-                print("UYARI: Pazar resimleri yüklenememiş")
+            if not self.game_controller or not self.game_controller.market:
+                print("Pazar çizilemedi: Market nesnesi bulunamadı")
                 return
             
-            # Pazar boyutlarını ayarla
-            market_width = 65
-            market_height = 65
+            market = self.game_controller.market
             
-            # Pazar resimlerini ölçeklendir
-            scaled_pazar1 = self.images["pazar1"].scaled(market_width, market_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            scaled_pazar2 = self.images["pazar2"].scaled(market_width, market_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            # Pazar1 resmini kullan (genellikle pazar yapısı)
+            if self.images["pazar1"]:
+                # Pazar yapısı boyutlarını ayarla
+                market_width = 120
+                market_height = 120
+                
+                # Pazar resmini ölçeklendir
+                scaled_market = self.images["pazar1"].scaled(market_width, market_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                
+                # Pazar Y koordinatını, kilise ile benzer mantıkla hesapla
+                market_draw_y = self.height() - self.ground_height - market_height + 15
+                
+                # Pazar yapısının kendisini çiz
+                painter.drawPixmap(
+                    int(market.x), 
+                    int(market_draw_y),
+                    scaled_market
+                )
+                
+                print(f"Pazar yapısı çizildi: Konum=({int(market.x)}, {int(market_draw_y)}), Boyut={market_width}x{market_height}")
             
-            # Kalenin konumundan 300 piksel sağda başla
-            base_x = 600 + 10  # Kale 10 pikselde başlıyor
-            
-            # Y pozisyonunu hesapla (zemin üzerinde)
-            market_y = self.height() - self.ground_height - market_height + 11
-            
-            # Pazar1'i çiz
-            painter.drawPixmap(base_x, market_y, scaled_pazar1)
-            
-            # Pazar2'yi çiz (10 piksel sağda)
-            painter.drawPixmap(base_x + market_width + 10, market_y, scaled_pazar2)
-            
-            print(f"Pazarlar çizildi: Pazar1=({base_x}, {market_y}), Pazar2=({base_x + market_width + 10}, {market_y})")
+            # Pazar tezgahlarını çiz
+            if self.images["pazar2"]:
+                for i, stall in enumerate(market.stalls):
+                    # Tezgah boyutlarını ayarla
+                    stall_width = 50
+                    stall_height = 50
+                    
+                    # Tezgah resmini ölçeklendir
+                    scaled_stall = self.images["pazar2"].scaled(stall_width, stall_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    
+                    # Tezgah Y koordinatını, kilise ile benzer mantıkla hesapla
+                    stall_draw_y = self.height() - self.ground_height - stall_height + 5
+                    
+                    # Tezgahları ana yapının sağına doğru yerleştir
+                    stall_x = int(market.x + market_width + 20 + (i * (stall_width + 10)))
+                    
+                    # Tezgahları çiz
+                    painter.drawPixmap(
+                        stall_x, 
+                        stall_draw_y,
+                        scaled_stall
+                    )
+                    
+                    # Tezgah konumunu güncelle (game_controller erişimi için)
+                    stall.x = stall_x + stall_width/2
+                    stall.y = stall_draw_y + stall_height
+                    
+                    # Tezgahta ürün ve fiyat bilgisini göster
+                    if stall.is_active:
+                        # Tezgah başlığını yaz
+                        painter.setPen(Qt.black)
+                        painter.setFont(QFont("Arial", 8, QFont.Bold))
+                        product_name = {
+                            "odun": "Odun Tezgahı",
+                            "erzak": "Erzak Tezgahı",
+                            "ev": "Ev Satışı"
+                        }.get(stall.stall_type, stall.stall_type.capitalize())
+                        
+                        painter.drawText(
+                            stall_x, 
+                            stall_draw_y - 25,
+                            stall_width,
+                            20,
+                            Qt.AlignCenter,
+                            product_name
+                        )
+                        
+                        # Eğer aktif bir satıcı varsa
+                        if stall.owner:
+                            inventory_count = stall.inventory.get(stall.stall_type, 0)
+                            price_text = f"Fiyat: {stall.price} altın"
+                            inventory_text = f"Stok: {inventory_count}"
+                            
+                            # Arka plan ekle
+                            bg_rect = QRect(
+                                stall_x, 
+                                stall_draw_y - 5,
+                                stall_width,
+                                40
+                            )
+                            painter.fillRect(bg_rect, QColor(255, 255, 255, 180))
+                            
+                            # Fiyat bilgisini yaz
+                            painter.setPen(Qt.darkBlue)
+                            painter.setFont(QFont("Arial", 8))
+                            painter.drawText(
+                                stall_x, 
+                                stall_draw_y - 5,
+                                stall_width,
+                                20,
+                                Qt.AlignCenter,
+                                price_text
+                            )
+                            
+                            # Stok bilgisini yaz
+                            painter.setPen(Qt.darkGreen)
+                            painter.drawText(
+                                stall_x, 
+                                stall_draw_y + 10,
+                                stall_width,
+                                20,
+                                Qt.AlignCenter,
+                                inventory_text
+                            )
+                            
+                            # Satıcı ismini yaz
+                            painter.setPen(Qt.darkRed)
+                            painter.setFont(QFont("Arial", 7))
+                            painter.drawText(
+                                stall_x, 
+                                stall_draw_y + 25,
+                                stall_width,
+                                20,
+                                Qt.AlignCenter,
+                                f"Satıcı: {stall.owner.name}"
+                            )
+                            
+                    print(f"Pazar tezgahı #{i+1} çizildi: Konum=({stall_x}, {stall_draw_y})")
             
         except Exception as e:
             print(f"HATA: Pazar çizme hatası: {e}")
@@ -939,10 +1035,11 @@ class GroundWidget(QWidget):
             # Gardiyan resmini ölçeklendir
             scaled_guard = self.images["gardiyan"].scaled(guard_width, guard_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
-            # Kalenin konumundan 900 piksel sağda
-            guard_x = 900 + 10  # Kale 10 pikselde başlıyor
+            # Kalenin sağında, kilise ve pazarın sonrasında olsun
+            # Kilise 310'da, pazar yaklaşık 400, tezgahlar 660'a kadar
+            guard_x = 800  # Kilise ve pazardan sonra
             
-            # Y pozisyonunu hesapla (zemin üzerinde)
+            # Y pozisyonunu kilise ile aynı seviyede hesapla (kilise Y=955'te çiziliyor)
             guard_y = self.height() - self.ground_height - guard_height + 5
             
             # Gardiyanı çiz

@@ -20,7 +20,7 @@ class Wolf:
     state: str = "Dolaşıyor"  # Kurdun durumu
     
     # Hareket özellikleri
-    speed: float = 0.8  # Hızı - köylülerden biraz daha hızlı
+    speed: float = 0.8  # Hızı - köylülerden biraz daha hızlı (0.8'den 2.0'a yükseltildi)
     move_counter: int = 0
     max_move_time: int = 50
     is_wandering: bool = True
@@ -33,7 +33,7 @@ class Wolf:
     # Animasyon özellikleri
     current_frame: int = 0
     frame_count: int = 2
-    animation_speed: float = 0.2
+    animation_speed: float = 0.1  # 0.2'den 0.1'e düşürüldü (daha hızlı animasyon)
     last_frame_time: float = 0
     is_moving: bool = False
     
@@ -55,7 +55,7 @@ class Wolf:
     crouch_frame: int = 0  # Çömelme karesi (animasyon için)
     
     # Hareket değişkenleri
-    max_speed: float = 1.8  # Maksimum hız
+    max_speed: float = 3.0  # Maksimum hız (1.8'den 3.0'a yükseltildi)
     wander_counter: int = 0  # Dolaşma sayacı
     max_wander_time: int = 200  # Maksimum dolaşma süresi
     
@@ -106,18 +106,20 @@ class Wolf:
             if not self.is_moving:
                 return
                 
-            # Hedefe doğru hareket
+            # Hedefe doğru hareket - her frame'de daha fazla hareket
+            move_step = self.speed * 1.5  # Hareket adımını 1.5 kat artır
+            
             if self.target_x > self.x:
                 self.direction = 1
                 self.direction_x = 1
-                self.x += self.speed
+                self.x += move_step
             else:
                 self.direction = -1
                 self.direction_x = -1
-                self.x -= self.speed
+                self.x -= move_step
                 
             # Hedefe ulaşıldı mı kontrol et
-            if abs(self.target_x - self.x) < 5:
+            if abs(self.target_x - self.x) < 10:  # 5 yerine 10 piksel hassasiyet
                 # Hedefe ulaşıldı, dolaşma durumunu güncelle
                 self.is_wandering = False
                 self.move_counter = 0
@@ -135,8 +137,8 @@ class Wolf:
         try:
             current_time = time.time()
             
-            # Animasyon zamanını güncelle
-            self.animation_time += 0.016  # Yaklaşık 60 FPS
+            # Animasyon zamanını güncelle - daha hızlı güncelleme
+            self.animation_time += 0.032  # 0.016'nın 2 katı, daha akıcı animasyon
             
             # Eğilme animasyonunu güncelle
             if self.is_moving or self.is_hunting:
@@ -161,7 +163,7 @@ class Wolf:
                 self.rotation = self.current_rotation
                 self.y = self.base_y
             
-            # Animasyon hızına göre kare değişimi
+            # Animasyon hızına göre kare değişimi - daha hızlı frame değişimi
             if current_time - self.last_frame_time >= self.animation_speed:
                 if self.is_moving or self.is_hunting:
                     self.current_frame = (self.current_frame + 1) % self.frame_count
@@ -185,7 +187,7 @@ class Wolf:
             if self.is_daytime:
                 # Mağaranın etrafında rastgele bir konum belirle
                 angle = random.uniform(0, 2 * math.pi)  # 0-360 derece arası rastgele açı
-                distance = random.uniform(100, self.cave_radius)  # Mağaradan olan uzaklık
+                distance = random.uniform(150, self.cave_radius)  # Mesafe artırıldı (100 yerine 150)
                 
                 # Polar koordinatları kartezyen koordinatlara dönüştür
                 self.target_x = self.cave_x + distance * math.cos(angle)
@@ -237,4 +239,18 @@ class Wolf:
     
     def set_game_controller(self, game_controller):
         """Oyun kontrolcüsünü ayarla"""
-        self.game_controller = game_controller 
+        self.game_controller = game_controller
+        
+    def update(self):
+        """Kurt durumunu güncelle - hareket ve animasyon için"""
+        try:
+            # Kurdu hareket ettir
+            self.move()
+            
+            # Animasyonu güncelle
+            self.update_animation()
+            
+        except Exception as e:
+            print(f"HATA: Kurt güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc() 
