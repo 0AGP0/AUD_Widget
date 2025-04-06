@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from PyQt5.QtCore import QObject, QRectF, pyqtSignal
 
 class MarketStall(QObject):
-    """Pazar tezgahı sınıfı"""
+    """Pazar tezgahı sınıfı - Merkezi Stok Sistemiyle Uyumlu"""
     
     def __init__(self, x: float, y: float, width: int = 50, height: int = 40, stall_type: str = "odun"):
         super().__init__()
@@ -14,21 +14,18 @@ class MarketStall(QObject):
         self.stall_type = stall_type  # odun, erzak, vb.
         self.owner = None  # Tezgahı kiralayan köylü
         self.is_active = False  # Tezgah şu anda aktif mi?
-        self.inventory = {stall_type: 0}  # Tezgahtaki ürün miktarı
-        self.price = self.get_default_price()  # Varsayılan fiyat
+        self.inventory = 0  # Basitleştirilmiş envanter (sadece sayı)
         self.id = id(self)
+        
+        # Merkezi pazara referans
+        self.market = None
         
         # Tezgahın çarpışma alanı
         self.rect = QRectF(self.x - self.width / 2, self.y - self.height, self.width, self.height)
-        
-    def get_default_price(self) -> int:
-        """Ürün tipine göre varsayılan fiyatı döndürür"""
-        price_map = {
-            "odun": 5,  # Odun birim fiyatı
-            "erzak": 7,  # Erzak birim fiyatı
-            "ev": 100,   # Ev fiyatı
-        }
-        return price_map.get(self.stall_type, 10)  # Varsayılan fiyat
+    
+    def set_market(self, market):
+        """Tezgahın bağlı olduğu pazarı ayarla"""
+        self.market = market
     
     def set_owner(self, villager) -> bool:
         """Tezgah sahibini ayarla"""
@@ -45,131 +42,119 @@ class MarketStall(QObject):
         """Tezgahı serbest bırak"""
         self.owner = None
         self.is_active = False
-        self.inventory = {self.stall_type: 0}
+        self.inventory = 0
         print(f"Tezgah ID: {self.id} serbest bırakıldı.")
     
     def add_inventory(self, amount: int) -> None:
-        """Tezgah envanterine ürün ekle"""
-        self.inventory[self.stall_type] += amount
-        print(f"Tezgah ID: {self.id} envanterine {amount} {self.stall_type} eklendi. Yeni durum: {self.inventory}")
+        """Tezgah envanterine ürün ekle - Merkezi stok sistemine aktarılır"""
+        if self.market:
+            if self.stall_type == "odun":
+                self.market.add_wood(amount)
+            elif self.stall_type == "yiyecek":
+                self.market.add_food(amount)
     
     def has_enough_inventory(self, amount: int) -> bool:
-        """Tezgahta yeterli ürün var mı kontrol et"""
-        return self.inventory.get(self.stall_type, 0) >= amount
-    
-    def remove_inventory(self, amount: int) -> bool:
-        """Tezgah envanterinden ürün çıkar"""
-        if not self.has_enough_inventory(amount):
-            print(f"Tezgah ID: {self.id} envanterinde yeterli {self.stall_type} yok!")
+        """Tezgahta (veya merkezi stokta) yeterli ürün var mı kontrol et"""
+        if not self.market:
             return False
             
-        self.inventory[self.stall_type] -= amount
-        print(f"Tezgah ID: {self.id} envanterinden {amount} {self.stall_type} çıkarıldı. Yeni durum: {self.inventory}")
-        return True
+        if self.stall_type == "odun":
+            return self.market.wood_stock >= amount
+        elif self.stall_type == "yiyecek":
+            return self.market.food_stock >= amount
+        
+        return False
     
-    def set_price(self, new_price: int) -> None:
-        """Ürün fiyatını ayarla"""
-        self.price = max(1, new_price)  # En düşük fiyat 1 altın
-        print(f"Tezgah ID: {self.id} fiyatı: {self.price} altın olarak güncellendi.")
+    def remove_inventory(self, amount: int) -> bool:
+        """Tezgah envanterinden ürün çıkar - Merkezi stok sisteminden çekilir"""
+        if not self.market:
+            return False
+            
+        if self.stall_type == "odun":
+            return self.market.remove_wood(amount)
+        elif self.stall_type == "yiyecek":
+            return self.market.remove_food(amount)
+            
+        return False
+    
+    def get_price(self, amount: int) -> int:
+        """Ürün fiyatını hesapla (sabit fiyat)"""
+        if not self.market:
+            return 0
+            
+        if self.stall_type == "odun":
+            return self.market.wood_price * amount
+        elif self.stall_type == "yiyecek":
+            return self.market.food_price * amount
+            
+        return 0
     
     def contains_point(self, x: float, y: float) -> bool:
         """Verilen nokta tezgahın içinde mi kontrol et"""
         return self.rect.contains(x, y)
-    
-    def negotiate_price(self, buyer, amount: int) -> int:
-        """Alıcı ile pazarlık yap ve son fiyatı belirle"""
-        if not self.owner or not self.is_active:
-            return 0
-            
-        base_price = self.price * amount  # Temel fiyat
-        
-        # İlişki durumunu kontrol et
-        relationship_bonus = 0
-        if buyer.name in self.owner.relationships:
-            relationship_value = self.owner.relationships[buyer.name]
-            relationship_bonus = relationship_value / 20  # -5 ile +5 arası bonus
-        
-        # Satıcı ve alıcının özelliklerini kontrol et
-        seller_trait_bonus = 0
-        if "Kurnaz" in self.owner.traits:
-            seller_trait_bonus += 1  # Satıcı kurnazsa fiyat artar
-        if "Cömert" in self.owner.traits:
-            seller_trait_bonus -= 2  # Satıcı cömertse fiyat azalır
-        
-        buyer_trait_bonus = 0
-        if "Kurnaz" in buyer.traits:
-            buyer_trait_bonus -= 1  # Alıcı kurnazsa fiyat azalır
-        if "Cömert" in buyer.traits:
-            buyer_trait_bonus += 1  # Alıcı cömertse fiyat artar
-        
-        # Müzakere başarı şansını hesapla
-        charisma_diff = (buyer.charisma - self.owner.charisma) / 10  # -5 ile +5 arası
-        
-        # Toplam fiyat ayarlaması
-        price_adjustment = relationship_bonus + seller_trait_bonus + buyer_trait_bonus + charisma_diff
-        adjusted_price = max(1, int(base_price * (1 + price_adjustment / 10)))  # En fazla %50 indirim/artış
-        
-        print(f"Pazarlık: {buyer.name} ve {self.owner.name} arasında {amount} {self.stall_type} için pazarlık.")
-        print(f"Başlangıç fiyatı: {base_price}, Son fiyat: {adjusted_price} altın")
-        
-        return adjusted_price
 
 
 class Market(QObject):
-    """Pazar alanı sınıfı"""
-    transaction_completed = pyqtSignal(object, object, str, int, int)  # Satıcı, alıcı, ürün, miktar, fiyat
+    """Basit pazar sınıfı"""
+    transaction_completed = pyqtSignal(object, object, str, int, int)  # satıcı, alıcı, ürün, miktar, fiyat
     
-    def __init__(self, x: float, y: float, width: int = 300, height: int = 200):
+    def __init__(self, x: float, y: float, width: int = 50, height: int = 50):
         super().__init__()
         self.x = x
         self.y = y
         self.width = width
         self.height = height
-        self.stalls: List[MarketStall] = []
-        self.is_active = True
         
-        # Pazar alanının çarpışma alanı
+        # Merkezi stok sistemi
+        self.wood_stock = 0  # Odun stoğu
+        self.food_stock = 0  # Yiyecek stoğu
+        
+        # Sabit fiyatlar
+        self.wood_price = 2  # Odun fiyatı sabit: 2 altın
+        self.food_price = 3  # Yiyecek fiyatı sabit: 3 altın
+        
+        # Pazar alanının sınırları
         self.rect = QRectF(self.x, self.y - self.height, self.width, self.height)
+        
+        # Tezgahlar
+        self.stalls = []
+        
+        # Kuyu pozisyonu (ground_widget tarafından kullanılacak)
+        self.kuyu_x = 0
         
         # Varsayılan tezgahları oluştur
         self.create_default_stalls()
         
         print(f"Pazar alanı oluşturuldu: ({self.x}, {self.y}), {self.width}x{self.height}")
     
-    def create_default_stalls(self) -> None:
-        """Varsayılan tezgahları oluştur"""
-        stall_types = ["odun", "erzak", "ev"]
+    def create_default_stalls(self):
+        """Varsayılan tezgahları oluştur - Sadece görsel amaçlı"""
+        stall_types = ["tezgah1", "tezgah2", "tezgah3", "tezgah4"]  # İşlevsel olmayan tezgahlar
         stall_width = 50
+        stall_gap = 6  # Tezgahlar arası mesafe 6 piksel
         
-        # Tezgahları yan yana yerleştir
+        # Tezgah başlangıç pozisyonu
+        base_x = self.x + 60
+        
+        # Tüm tezgahları yan yana yerleştir
         for i, stall_type in enumerate(stall_types):
-            stall_x = self.x + 60 + (i * (stall_width + 20))  # 20 piksel boşluk
+            # Tezgah pozisyonu: Tüm tezgahlar yan yana 6 piksel arayla
+            stall_x = base_x + (i * (stall_width + stall_gap))
             stall_y = self.y - 40  # Zeminden 40 piksel yukarıda
             
             stall = MarketStall(stall_x, stall_y, stall_width, 40, stall_type)
+            stall.set_market(self)  # Pazara referans ver
             self.stalls.append(stall)
             
-            print(f"{stall_type.capitalize()} tezgahı oluşturuldu: ({stall_x}, {stall_y})")
+            print(f"Tezgah {i+1} oluşturuldu: ({stall_x}, {stall_y})")
+        
+        # Kuyu artık kalenin 300 piksel sağına yerleştirildi, burada hesaplamaya gerek yok
     
     def find_stall_by_type(self, stall_type: str) -> Optional[MarketStall]:
         """Belirli tipteki tezgahı bul"""
         for stall in self.stalls:
             if stall.stall_type == stall_type:
                 return stall
-        return None
-    
-    def find_available_stall(self, stall_type: str) -> Optional[MarketStall]:
-        """Müsait olan belirli tipteki tezgahı bul"""
-        stall = self.find_stall_by_type(stall_type)
-        if stall and not stall.is_active:
-            return stall
-        return None
-    
-    def find_active_stall(self, stall_type: str) -> Optional[MarketStall]:
-        """Aktif olan belirli tipteki tezgahı bul"""
-        stall = self.find_stall_by_type(stall_type)
-        if stall and stall.is_active:
-            return stall
         return None
     
     def find_stall_by_owner(self, villager) -> Optional[MarketStall]:
@@ -179,53 +164,163 @@ class Market(QObject):
                 return stall
         return None
     
+    def get_wood_price(self) -> int:
+        """Odun fiyatını döndür"""
+        return self.wood_price
+    
+    def get_food_price(self) -> int:
+        """Yiyecek fiyatını döndür"""
+        return self.food_price
+    
     def contains_point(self, x: float, y: float) -> bool:
         """Verilen nokta pazar alanının içinde mi kontrol et"""
         return self.rect.contains(x, y)
     
-    def process_transaction(self, buyer, seller, stall_type: str, amount: int) -> bool:
-        """Alışveriş işlemini gerçekleştir"""
-        # Satıcının tezgahını bul
-        seller_stall = self.find_stall_by_owner(seller)
-        if not seller_stall or seller_stall.stall_type != stall_type:
-            print(f"Satıcı {seller.name}'in {stall_type} tezgahı bulunamadı!")
-            return False
+    def add_wood(self, amount: int) -> None:
+        """Pazar stoğuna odun ekle"""
+        self.wood_stock += amount
+        print(f"Pazar stoğuna {amount} odun eklendi. Toplam: {self.wood_stock}")
         
-        # Tezgahta yeterli ürün var mı kontrol et
-        if not seller_stall.has_enough_inventory(amount):
-            print(f"Satıcı {seller.name}'in tezgahında yeterli {stall_type} yok!")
-            return False
-        
-        # Fiyatı belirle (pazarlık yaş)
-        price = seller_stall.negotiate_price(buyer, amount)
-        
-        # Alıcının yeterli parası var mı kontrol et
-        if buyer.money < price:
-            print(f"Alıcı {buyer.name}'in yeterli parası yok! Gerekli: {price}, Mevcut: {buyer.money}")
-            return False
-        
-        # Ürünü tezgahtan çıkar
-        if not seller_stall.remove_inventory(amount):
-            return False
-        
-        # Parayı transfer et
-        buyer.money -= price
-        seller.money += price
-        
-        # Alıcı ve satıcı arasındaki ilişkiyi güncelle
-        # İşlem başarılı olduysa ilişkiyi biraz artır
-        if buyer.name in seller.relationships:
-            seller.relationships[buyer.name] += 2
-        else:
-            seller.relationships[buyer.name] = 2
+        # Kontrol panelini güncelle
+        if hasattr(self, 'game_controller') and self.game_controller:
+            if hasattr(self.game_controller, 'control_panel') and self.game_controller.control_panel:
+                self.game_controller.control_panel.update_market_inventory()
+    
+    def remove_wood(self, amount: int) -> bool:
+        """Pazar stoğundan odun çıkar"""
+        if self.wood_stock >= amount:
+            self.wood_stock -= amount
+            print(f"Pazar stoğundan {amount} odun çıkarıldı. Kalan: {self.wood_stock}")
             
-        if seller.name in buyer.relationships:
-            buyer.relationships[seller.name] += 2
+            # Kontrol panelini güncelle
+            if hasattr(self, 'game_controller') and self.game_controller:
+                if hasattr(self.game_controller, 'control_panel') and self.game_controller.control_panel:
+                    self.game_controller.control_panel.update_market_inventory()
+                
+            return True
         else:
-            buyer.relationships[seller.name] = 2
+            print(f"HATA: Pazarda yeterli odun yok! İstenen: {amount}, Mevcut: {self.wood_stock}")
+            return False
+    
+    def sell_wood(self, seller, amount: int) -> None:
+        """Oduncunun odun satması"""
+        # Odun stoğuna ekle
+        self.add_wood(amount)
         
-        # Tamamlanan işlemi bildir
-        self.transaction_completed.emit(seller, buyer, stall_type, amount, price)
+        # Satıcıya para öde
+        earned_money = amount * self.wood_price
+        seller.money += earned_money
         
-        print(f"İşlem tamamlandı: {buyer.name}, {seller.name}'den {amount} {stall_type} satın aldı. Fiyat: {price} altın")
-        return True 
+        # İşlem bilgisini bildir
+        print(f"{seller.name} pazara {amount} odun sattı ve {earned_money} altın kazandı!")
+        # Signal gönder
+        self.transaction_completed.emit(seller, None, "odun", amount, earned_money)
+    
+    def buy_wood(self, buyer, amount: int) -> bool:
+        """Alıcının odun satın alması"""
+        # Yeterli odun var mı kontrol et
+        if self.wood_stock < amount:
+            print(f"HATA: Pazarda yeterli odun yok! İstenen: {amount}, Mevcut: {self.wood_stock}")
+            return False
+        
+        # Alıcının parası yeterli mi kontrol et
+        cost = amount * self.wood_price
+        if buyer.money < cost:
+            print(f"HATA: {buyer.name}'in parası yeterli değil! Gerekli: {cost}, Mevcut: {buyer.money}")
+            return False
+        
+        # İşlemi gerçekleştir
+        self.remove_wood(amount)
+        buyer.money -= cost
+        
+        # İşlem bilgisini bildir
+        print(f"{buyer.name} pazardan {amount} odun satın aldı ve {cost} altın ödedi!")
+        # Signal gönder
+        self.transaction_completed.emit(None, buyer, "odun", amount, cost)
+        
+        return True
+    
+    def add_food(self, amount: int) -> None:
+        """Pazar stoğuna yiyecek ekle"""
+        self.food_stock += amount
+        print(f"Pazar stoğuna {amount} yiyecek eklendi. Toplam: {self.food_stock}")
+        
+        # Kontrol panelini güncelle
+        if hasattr(self, 'game_controller') and self.game_controller:
+            if hasattr(self.game_controller, 'control_panel') and self.game_controller.control_panel:
+                self.game_controller.control_panel.update_market_inventory()
+    
+    def remove_food(self, amount: int) -> bool:
+        """Pazar stoğundan yiyecek çıkar"""
+        if self.food_stock >= amount:
+            self.food_stock -= amount
+            print(f"Pazar stoğundan {amount} yiyecek çıkarıldı. Kalan: {self.food_stock}")
+            
+            # Kontrol panelini güncelle
+            if hasattr(self, 'game_controller') and self.game_controller:
+                if hasattr(self.game_controller, 'control_panel') and self.game_controller.control_panel:
+                    self.game_controller.control_panel.update_market_inventory()
+                
+            return True
+        else:
+            print(f"HATA: Pazarda yeterli yiyecek yok! İstenen: {amount}, Mevcut: {self.food_stock}")
+            return False
+    
+    def sell_food(self, seller, amount: int) -> None:
+        """Çiftçinin yiyecek satması"""
+        # Yiyecek stoğuna ekle
+        self.add_food(amount)
+        
+        # Satıcıya para öde
+        earned_money = amount * self.food_price
+        seller.money += earned_money
+        
+        # İşlem bilgisini bildir
+        print(f"{seller.name} pazara {amount} yiyecek sattı ve {earned_money} altın kazandı!")
+        # Signal gönder
+        self.transaction_completed.emit(seller, None, "yiyecek", amount, earned_money)
+    
+    def buy_food(self, buyer, amount: int) -> bool:
+        """Alıcının yiyecek satın alması"""
+        # Yeterli yiyecek var mı kontrol et
+        if self.food_stock < amount:
+            print(f"HATA: Pazarda yeterli yiyecek yok! İstenen: {amount}, Mevcut: {self.food_stock}")
+            return False
+        
+        # Alıcının parası yeterli mi kontrol et
+        cost = amount * self.food_price
+        if buyer.money < cost:
+            print(f"HATA: {buyer.name}'in parası yeterli değil! Gerekli: {cost}, Mevcut: {buyer.money}")
+            return False
+        
+        # İşlemi gerçekleştir
+        self.remove_food(amount)
+        buyer.money -= cost
+        
+        # İşlem bilgisini bildir
+        print(f"{buyer.name} pazardan {amount} yiyecek satın aldı ve {cost} altın ödedi!")
+        # Signal gönder
+        self.transaction_completed.emit(None, buyer, "yiyecek", amount, cost)
+        
+        return True
+        
+    def process_transaction(self, buyer, seller, item_type, amount):
+        """Uyumluluk için eski işlem metodu"""
+        if item_type == "odun":
+            if seller:
+                self.sell_wood(seller, amount)
+                return True
+            elif buyer:
+                return self.buy_wood(buyer, amount)
+        elif item_type == "yiyecek":
+            if seller:
+                self.sell_food(seller, amount)
+                return True
+            elif buyer:
+                return self.buy_food(buyer, amount)
+        
+        return False
+
+    def set_game_controller(self, game_controller):
+        """Oyun kontrolcüsünü ayarla"""
+        self.game_controller = game_controller 

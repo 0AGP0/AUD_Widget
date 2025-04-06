@@ -135,17 +135,12 @@ def create_going_home_behavior(villager):
 
 def create_profession_behavior(villager):
     """Köylü için mesleğe özel davranışları oluşturur"""
-    # Meslek sekansı
-    profession_sequence = SequenceNode("Meslek Sekansı")
-    
-    # Gündüz mü kontrolü
-    is_day = ConditionNode("Gündüz mü?", 
-                         lambda v, dt: hasattr(v, 'game_controller') and 
-                                      v.game_controller.is_daytime)
-    profession_sequence.add_child(is_day)
-    
-    # Meslek seçici
+    # Meslek seçici düğümü oluştur
+    profession_sequence = SequenceNode("Meslek Davranışı")
+
+    # Mesleğe özel davranışları kontrol et
     profession_selector = SelectorNode("Meslek Seçici")
+    profession_sequence.add_child(profession_selector)
     
     # Oduncu davranışı
     woodcutter_sequence = SequenceNode("Oduncu Davranışı")
@@ -166,11 +161,11 @@ def create_profession_behavior(villager):
                                  lambda v, dt: handle_woodcutter_job(v))
     woodcutter_sequence.add_child(woodcutter_action)
     
-    # İnşaatçı davranışı
+    # İnşaatçı davranışı - En Yüksek Önceliğe Taşıyalım
     builder_sequence = SequenceNode("İnşaatçı Davranışı")
     is_builder = ConditionNode("İnşaatçı mı?", 
-                             lambda v, dt: hasattr(v, 'profession') and 
-                                          v.profession == "İnşaatçı")
+                               lambda v, dt: hasattr(v, 'profession') and 
+                                            v.profession == "İnşaatçı")
     builder_sequence.add_child(is_builder)
     
     # Günlük bina inşa limiti dolmamış mı?
@@ -212,11 +207,11 @@ def create_profession_behavior(villager):
     farmer_sequence.add_child(is_farmer)
     
     # Günlük hasat limiti dolmamış mı?
-    harvest_limit_not_reached = ConditionNode("Hasat Limiti Dolmadı mı?", 
-                                           lambda v, dt: hasattr(v, 'crops_harvested') and 
-                                                        hasattr(v, 'max_harvests_per_day') and
-                                                        v.crops_harvested < v.max_harvests_per_day)
-    farmer_sequence.add_child(harvest_limit_not_reached)
+    harvesting_limit_not_reached = ConditionNode("Hasat Limiti Dolmadı mı?", 
+                                              lambda v, dt: hasattr(v, 'crops_harvested') and 
+                                                           hasattr(v, 'max_harvests_per_day') and
+                                                           v.crops_harvested < v.max_harvests_per_day)
+    farmer_sequence.add_child(harvesting_limit_not_reached)
     
     # Çiftçi işini yap
     farmer_action = ActionNode("Çiftçi İşi Yap", 
@@ -232,9 +227,9 @@ def create_profession_behavior(villager):
     
     # Günlük devriye limiti dolmamış mı?
     patrol_limit_not_reached = ConditionNode("Devriye Limiti Dolmadı mı?", 
-                                          lambda v, dt: hasattr(v, 'patrol_count') and 
-                                                       hasattr(v, 'max_patrols_per_day') and
-                                                       v.patrol_count < v.max_patrols_per_day)
+                                           lambda v, dt: hasattr(v, 'patrol_count') and 
+                                                        hasattr(v, 'max_patrols_per_day') and
+                                                        v.patrol_count < v.max_patrols_per_day)
     guard_sequence.add_child(patrol_limit_not_reached)
     
     # Gardiyan işini yap
@@ -242,15 +237,12 @@ def create_profession_behavior(villager):
                             lambda v, dt: handle_guard_job(v))
     guard_sequence.add_child(guard_action)
     
-    # Meslekleri seçiciye ekle
-    profession_selector.add_child(woodcutter_sequence)
+    # Meslekleri öncelikli olarak ekle - en üst öncelikli İnşaatçı olsun
     profession_selector.add_child(builder_sequence)
+    profession_selector.add_child(woodcutter_sequence)
     profession_selector.add_child(hunter_sequence)
     profession_selector.add_child(farmer_sequence)
     profession_selector.add_child(guard_sequence)
-    
-    # Meslek seçiciyi sekansa ekle
-    profession_sequence.add_child(profession_selector)
     
     return profession_sequence
 
@@ -341,15 +333,124 @@ def handle_woodcutter_job(villager):
         return NodeStatus.FAILURE
 
 def handle_builder_job(villager):
-    """İnşaatçı işi yap eylemi"""
+    """İnşaatçı işini yap"""
     try:
-        # İnşaatçı işi yap
-        if hasattr(villager, 'handle_builder'):
-            villager.handle_builder()
-            return NodeStatus.SUCCESS
-        return NodeStatus.FAILURE
+        print(f"DEBUG: {villager.name} inşaatçı işini yapıyor")
+        
+        # İnşaatçının oyun kontrolcüsü var mı kontrol et
+        if not hasattr(villager, 'game_controller') or not villager.game_controller:
+            print(f"DEBUG: {villager.name} için game_controller bulunamadı")
+            return NodeStatus.FAILURE
+        
+        game_controller = villager.game_controller
+        
+        # Kale ve envanterini kontrol et
+        if not hasattr(game_controller, 'castle') or not game_controller.castle:
+            print(f"DEBUG: İNŞAATÇI HATA: {villager.name} kaleyi bulamadı!")
+            return NodeStatus.FAILURE
+        
+        castle = game_controller.castle
+        wood_amount = castle.get_inventory().get('odun', 0)
+        print(f"DEBUG: Kale envanterinde {wood_amount} odun var. İnşaat için 30 odun gerekiyor.")
+        
+        # İnşaatçı zaten inşaat yapıyor mu?
+        if hasattr(villager, 'is_building') and villager.is_building:
+            print(f"DEBUG: {villager.name} zaten inşaat yapıyor")
+            if hasattr(villager, 'target_building_site') and villager.target_building_site:
+                # İnşaat alanına yaklaş
+                building_site = villager.target_building_site
+                distance = abs(building_site.x - villager.x)
+                print(f"DEBUG: {villager.name} inşaat alanına mesafesi: {distance}")
+                
+                if distance > 20:
+                    # İnşaat alanına doğru hareket et
+                    if villager.x < building_site.x:
+                        villager.direction = 1  # Sağa
+                    else:
+                        villager.direction = -1  # Sola
+                    
+                    # İnşaat alanına hareket et
+                    villager.target_x = building_site.x
+                    villager.target_y = building_site.y
+                    villager.state = "İnşaat Alanına Gidiyor"
+                    print(f"DEBUG: {villager.name} inşaat alanına gidiyor. Hedef: ({building_site.x}, {building_site.y})")
+                    
+                    # Hareketi başlat
+                    villager.is_moving = True
+                    villager.is_wandering = False
+                    return NodeStatus.RUNNING
+                    
+                # İnşaat alanında, inşaat devam ediyor
+                villager.state = "İnşaat Yapıyor"
+                progress = building_site.progress if hasattr(building_site, 'progress') else 0
+                print(f"DEBUG: {villager.name} inşaata devam ediyor. İlerleme: {progress:.1f}%")
+                return NodeStatus.RUNNING
+            else:
+                # İnşaat alanı kayboldu
+                villager.is_building = False
+                villager.state = "İnşaat Alanı Kayboldu"
+                print(f"DEBUG: {villager.name} için inşaat alanı kayboldu!")
+                return NodeStatus.FAILURE
+        
+        # Yeterli odun var mı kontrol et (30 odun)
+        if wood_amount >= 30:
+            print(f"DEBUG: Yeterli odun var: {wood_amount}/30")
+            # Köylünün günlük inşa limiti dolmadı mı?
+            if not hasattr(villager, 'buildings_built') or not hasattr(villager, 'max_buildings_per_day'):
+                # Özellikler eksik, varsayılan değerleri ayarla
+                villager.buildings_built = 0
+                villager.max_buildings_per_day = 1
+                print(f"DEBUG: {villager.name} için eksik özellikler atandı. İnşaat sayısı: 0, Limit: 1")
+            
+            print(f"DEBUG: {villager.name} bugün {villager.buildings_built}/{villager.max_buildings_per_day} inşaat yapmış.")
+            if villager.buildings_built >= villager.max_buildings_per_day:
+                # Günlük limit doldu
+                villager.state = "Günlük İnşaat Limiti Doldu"
+                print(f"DEBUG: {villager.name} günlük inşaat limitine ulaştı! Limit: {villager.max_buildings_per_day}")
+                return NodeStatus.FAILURE
+            
+            # Otomatik inşaat kontrolü
+            print(f"DEBUG: {villager.name} otomatik inşaat kontrolü başlatıyor...")
+            
+            # Game Controller'ın potansiyel inşaat yerlerini bulup bulamadığını kontrol et
+            potential_locations = game_controller.find_potential_building_locations()
+            print(f"DEBUG: {len(potential_locations)} potansiyel inşaat lokasyonu bulundu: {potential_locations[:3] if potential_locations else 'Yok'}")
+            
+            # İnşaat başlatmayı dene
+            success = game_controller.check_for_auto_building()
+            
+            if success:
+                # İnşaat başlatıldı
+                print(f"DEBUG: {villager.name} için inşaat başlatıldı!")
+                return NodeStatus.SUCCESS
+            else:
+                # İnşaat başlatılamadı
+                print(f"DEBUG: {villager.name} için inşaat başlatılamadı! Ev sayısı: {len(game_controller.houses)}, Mevcut inşaatlar: {len(game_controller.building_sites)}")
+                # İnşaat için uygun yer bulunamadıysa, daha dar mesafe ile tekrar dene
+                if not potential_locations:
+                    print(f"DEBUG: {villager.name} daha küçük mesafe ile inşaat yeri arıyor...")
+                    potential_locations = game_controller.find_potential_building_locations(min_distance=60)
+                    if potential_locations:
+                        # Uygun bir yer bulduk, rastgele seç
+                        building_x = random.choice(potential_locations)
+                        # İnşaat alanı oluştur ve başlat
+                        building_site = game_controller.create_building_site(building_x, game_controller.ground_y, min_distance=60)
+                        if building_site and building_site.start_construction(villager):
+                            villager.is_building = True
+                            villager.target_building_site = building_site
+                            villager.state = "İnşaat Yapıyor"
+                            print(f"DEBUG: {villager.name} alternatif konumda inşaat başlattı: {building_x}")
+                            return NodeStatus.SUCCESS
+                
+                return NodeStatus.FAILURE
+        else:
+            # Yeterli odun yok, bekleyecek
+            villager.state = "Odun Bekliyor"
+            print(f"DEBUG: Yeterli odun yok: {wood_amount}/30 - {villager.name} odun bekliyor")
+            return NodeStatus.FAILURE
+    
     except Exception as e:
-        print(f"HATA: {villager.name} için inşaatçı işi yaparken hata: {e}")
+        print(f"HATA: İnşaatçı davranışı: {e}")
         import traceback
         traceback.print_exc()
         return NodeStatus.FAILURE

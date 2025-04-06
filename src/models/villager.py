@@ -14,8 +14,8 @@ class Villager:
     appearance: int = 0
     x: float = 0.0
     y: float = 0.0
-    width: int = 25  # Köylü genişliği (40'tan 20'ye düşürüldü)
-    height: int = 25  # Köylü yüksekliği (40'tan 20'ye düşürüldü)
+    width: int = 18  # Köylü genişliği (40'tan 20'ye düşürüldü)
+    height: int = 18  # Köylü yüksekliği (40'tan 20'ye düşürüldü)
     direction: int = 1  # 1 = sağa, -1 = sola
     direction_x: int = 1  # 1 = sağa, -1 = sola (çizim için)
     health: int = 100
@@ -42,7 +42,7 @@ class Villager:
     mood: str = "Sakin"  # Günlük ruh hali
     
     # Hareket özellikleri
-    speed: float = 0.65  # Hızı 0.65'ten 1.8'e yükseltildi
+    speed: float = 0.30  # Hızı 0.65'ten 1.8'e yükseltildi
     move_counter: int = 0
     max_move_time: int = 50
     is_wandering: bool = True
@@ -73,11 +73,10 @@ class Villager:
     
     # Oduncu özellikleri
     trees_cut_today: int = 0
-    max_trees_per_day: int = 2
-    cutting_power: int = 1
-    target_tree: Optional['Tree'] = None
-    is_cutting: bool = False
-    last_cut_time: float = 0.0
+    max_trees_per_day: int = 3  # Günlük kesebileceği maksimum ağaç
+    is_cutting: bool = False  # Şu an ağaç kesiyor mu?
+    target_tree = None  # Hedef ağaç
+    cutting_start_time: float = 0.0  # Kesime başlama zamanı
     
     # İnşaatçı özellikleri
     buildings_built: int = 0
@@ -145,7 +144,46 @@ class Villager:
     ]
     
     def __post_init__(self):
-        """Başlangıç değerlerini ayarla"""
+        """İnit sonrası ayarlamalar"""
+        # Davranış düğümü ve durumu için özellikler
+        self.behavior_tree = None
+        
+        # Referanslar
+        self.game_controller = None
+        
+        # Ek özellikler
+        self.is_chatting = False
+        self.chat_partner = None
+        
+        # Son konuşma metinleri
+        self.last_speaker = None  # Son konuşan kişi
+        self.last_message_was_question = False  # Son mesaj soru mu?
+        self.conversation_counter = 0  # Toplam konuşma mesajı sayısı
+        self.last_chat_message_time = 0  # Son mesaj zamanı
+        
+        # Diyalog baloncuğu için
+        self.active_bubble = False  # Aktif konuşma baloncuğu var mı?
+        self.bubble_start_time = 0  # Baloncuk başlangıç zamanı
+        self.current_bubble = None  # Mevcut baloncuk referansı
+        
+        # Animasyon için
+        self.has_hop = True  # Zıplama animasyonu olsun mu?
+        self.base_y = self.y  # Temel y koordinatı
+        
+        self.animation_timer = QTimer()
+        self.animation_timer.timeout.connect(self.update_animation)
+        self.animation_timer.start(50)  # 50ms'de bir animasyon güncelle (20 FPS)
+        
+        # Meslekler
+        self.available_professions = [
+            "Oduncu", "Çiftçi", "Avcı", "Balıkçı", "Demirci", 
+            "Tüccar", "Gardiyan", "Papaz", "İnşaatçı"
+        ]
+                
+        # Eğer profession atanmamışsa, rastgele bir meslek seç
+        if not self.profession:
+            self.profession = random.choice(self.available_professions)
+        
         if self.traits is None:
             self.traits = []
         if self.desired_traits is None:
@@ -176,27 +214,29 @@ class Villager:
         
         # İnşaatçı için 50 altın başlangıç parası, diğerleri için 0
         if profession == "İnşaatçı":
-            self.money = 50
-            print(f"{self.name} başlangıç parası: 50 altın")
+            self.money = 0  # Başlangıç parası
+            # İnşaatçı özellikleri
+            self.buildings_built = 0
+            self.max_buildings_per_day = 1
+            self.building_skill = 1
+            self.target_building_site = None
+            self.is_building = False
+            self.building_progress = 0.0
+            print(f"{self.name} inşaatçı olarak çalışmaya başladı. Günlük inşaat limiti: {self.max_buildings_per_day}")
         else:
             self.money = 0
             print(f"{self.name} başlangıç parası: 0 altın")
         
         # Oduncu için özel ayarlar
         if profession == "Oduncu":
-            self.trees_cut_today = 0  # Bugün kesilen ağaç sayısı
-            self.max_trees_per_day = 2  # Günlük kesebileceği maksimum ağaç
-            self.is_cutting = False  # Şu an ağaç kesiyor mu?
-            self.target_tree = None  # Hedef ağaç
-            self.last_cut_time = 0  # Son kesme zamanı
+            self.trees_cut_today = 0
+            self.max_trees_per_day = 3
+            self.is_cutting = False
+            self.target_tree = None
+            self.cutting_start_time = 0.0
+            print(f"{self.name} oduncu olarak çalışmaya başladı.")
         
-        # İnşaatçı için özel ayarlar
-        elif profession == "İnşaatçı":
-            self.buildings_built = 0  # Bugün inşa edilen bina sayısı
-            self.max_buildings_per_day = 1  # Günlük inşa edebileceği maksimum bina
-            self.is_building = False  # Şu an inşaat yapıyor mu?
-            self.target_building_site = None  # Hedef inşaat alanı
-            self.building_progress = 0.0  # İnşaat ilerleme durumu
+        # İnşaatçı için özel ayarlar - silindi
         
         # Avcı için özel ayarlar
         elif profession == "Avcı":
@@ -277,7 +317,7 @@ class Villager:
             self.animation_time += 0.032  # 0.016'nın 2 katı (daha akıcı animasyon)
             
             # Eğilme animasyonunu güncelle
-            if self.is_moving or self.is_cutting or self.is_building:
+            if self.is_moving or self.is_building or self.is_cutting:
                 time_diff = current_time - self.last_rotation_time
                 
                 # Her rotation_interval sürede bir yön değiştir
@@ -302,7 +342,7 @@ class Villager:
             
             # Animasyon hızına göre kare değişimi
             if current_time - self.last_frame_time >= self.animation_speed:
-                if self.is_moving or self.is_cutting or self.is_building:
+                if self.is_moving or self.is_building or self.is_cutting:
                     self.current_frame = (self.current_frame + 1) % self.frame_count
                 else:
                     self.current_frame = 0
@@ -328,25 +368,44 @@ class Villager:
                 
             # Gündüz - mesleğe göre davranış
             if self.profession == "Oduncu":
+                # Günlük kesim limitini kontrol et
                 if self.trees_cut_today < self.max_trees_per_day:
                     # Ağaç kesmeye öncelik ver
                     self.handle_woodcutter()
                     self.state = "Ağaç Arıyor" if not self.is_cutting else "Ağaç Kesiyor"
                 else:
-                    # Günlük kesim limiti dolduysa pazara git
-                    self.handle_woodcutter_market()
-                    if not self.is_selling and not self.has_market_stall:
-                        self.wander()  # Eğer pazarda değilse dolaş
-            elif self.profession == "İnşaatçı":
-                # Odun satın almak için pazara git veya ev inşa et
-                if self.money >= 5:  # En az bir odun alacak parası varsa
-                    self.handle_builder_market()
-                elif self.buildings_built < self.max_buildings_per_day:
-                    self.handle_builder()
-                    self.state = "İnşaat Arıyor" if not self.is_building else "İnşaat Yapıyor"
-                else:
+                    # Günlük kesim limiti dolduysa dolaş
                     self.wander()
-                    self.state = "Yoruldu Dolaşıyor"
+                    self.state = "Günlük Ağaç Limiti Doldu"
+            elif self.profession == "İnşaatçı":
+                # İnşaatçı için davranış ağacı kontrolü
+                if hasattr(self, 'game_controller') and self.game_controller:
+                    # Davranış ağacındaki fonksiyonu kullanmak için is_building kontrolü yap
+                    if self.is_building:
+                        # Zaten inşaat yapıyor, durumunu koru
+                        pass
+                    elif self.buildings_built < self.max_buildings_per_day:
+                        # Kullanılabilir odun kontrolü
+                        castle = self.game_controller.castle
+                        if castle:
+                            wood_amount = castle.get_inventory().get('odun', 0)
+                            if wood_amount >= 30:
+                                # Yeterli odun var, inşaat kontrol fonksiyonunu çağır
+                                success = self.game_controller.check_for_auto_building()
+                                if success:
+                                    self.state = "İnşaat Yapıyor"
+                                    return
+                                
+                    # İnşaat yapmıyorsa dolaş
+                    self.wander()
+                    if self.buildings_built >= self.max_buildings_per_day:
+                        self.state = "Günlük İnşaat Limiti Doldu"
+                    else:
+                        self.state = "İnşaat Malzemesi Bekliyor"
+                else:
+                    # Game controller yoksa sadece dolaş
+                    self.wander()
+                    self.state = "Dolaşıyor"
             elif self.profession == "Avcı":
                 if self.animals_hunted < self.max_hunts_per_day:
                     self.handle_hunter()
@@ -391,100 +450,6 @@ class Villager:
             import traceback
             traceback.print_exc()
     
-    def handle_builder(self):
-        """İnşaatçı mantığı"""
-        try:
-            # Eğer inşaat yapıyorsa
-            if self.is_building and self.target_building_site:
-                # İnşaat alanı görünür değilse veya listeden kaldırılmışsa
-                if not hasattr(self.target_building_site, 'is_active') or not self.target_building_site.is_active:
-                    self.is_building = False
-                    print(f"{self.name} inşaat ID: {self.target_building_site.id} tamamlandı, yeni inşaat alanı arıyor.")
-                    self.target_building_site = None
-                    # İnşaat tamamlandıktan sonra kısa bir süre bekle, sonra yeni inşaat alanı ara
-                    QTimer.singleShot(2000, self.find_building_site)
-                    # Bu arada biraz dolaş
-                    self.wander()
-                return
-                
-            # Yeni inşaat alanı ara
-            self.find_building_site()
-            
-        except Exception as e:
-            print(f"HATA: {self.name} inşaatçı mantığı hatası: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def find_building_site(self):
-        """İnşaat alanı bul veya oluştur"""
-        try:
-            if not hasattr(self, 'game_controller') or not self.game_controller:
-                return
-                
-            # Eğer zaten inşaat yapıyorsa yeni inşaat alanı arama
-            if self.is_building and self.target_building_site:
-                return
-                
-            # Mevcut inşaat alanlarını kontrol et
-            for site in self.game_controller.building_sites:
-                if hasattr(site, 'is_active') and site.is_active and not site.builder:
-                    # İnşaat alanına git
-                    distance = abs(site.x - self.x)
-                    if distance < 30:  # İnşaat mesafesindeyse
-                        # İnşaata başla
-                        if site.start_construction(self):
-                            self.target_building_site = site
-                            self.is_building = True
-                            self.is_moving = False
-                            print(f"{self.name} inşaata başladı. İnşaat ID: {site.id}")
-                            return
-                    else:  # İnşaat alanına doğru git
-                        self.move_towards(site.x)
-                        self.state = "İnşaat Alanına Gidiyor"
-                        print(f"{self.name} inşaat alanına doğru ilerliyor. Mesafe: {distance:.1f}")
-                        return
-            
-            # Mevcut inşaat alanı yoksa ve kale envanterinde yeterli odun varsa yeni inşaat alanı oluştur
-            if hasattr(self.game_controller, 'castle') and self.game_controller.castle:
-                castle = self.game_controller.castle
-                wood_amount = castle.get_inventory().get('odun', 0)
-                
-                # Kale envanterinde en az 20 odun olmalı
-                if wood_amount >= 20:
-                    # Rastgele bir konum seç (kale civarında)
-                    castle_x = self.game_controller.castle.x
-                    min_x = castle_x + 200  # Kaleden en az 200 piksel uzakta
-                    max_x = castle_x + 1000  # Kaleden en fazla 1000 piksel uzakta
-                    x = random.uniform(min_x, max_x)
-                    y = self.game_controller.ground_y
-                    
-                    # İnşaat alanı oluşturma şansı
-                    if random.random() < 0.5:  # %50 şans (0.3'ten 0.5'e yükseltildi)
-                        # İnşaat alanı oluştur
-                        building_site = self.game_controller.create_building_site(x, y)
-                        if building_site:
-                            # İnşaat alanına git
-                            self.move_towards(building_site.x)
-                            self.state = "Yeni İnşaat Alanına Gidiyor"
-                            print(f"{self.name} yeni inşaat alanına doğru ilerliyor. Mesafe: {abs(building_site.x - self.x):.1f}")
-                            return
-                else:
-                    # Yeterli odun yoksa durumu güncelle
-                    self.state = "Odun Bekleniyor"
-                    # Dolaşmaya devam et
-                    self.wander()
-                    print(f"{self.name} inşaat için yeterli odun bekliyor. Mevcut odun: {wood_amount}/20")
-                    return
-            
-            # İnşaat alanı bulunamadı veya oluşturulamadı, dolaş
-            self.wander()
-            self.state = "Dolaşıyor (İnşaat Bekliyor)"
-            
-        except Exception as e:
-            print(f"HATA: {self.name} inşaat alanı bulma hatası: {e}")
-            import traceback
-            traceback.print_exc()
-    
     def handle_hunter(self):
         """Avcı mantığı"""
         # Şimdilik sadece dolaş
@@ -504,123 +469,6 @@ class Villager:
         """Papaz mantığı"""
         # Şimdilik sadece dolaş
         self.wander()
-    
-    def handle_woodcutter(self):
-        """Oduncu mantığı"""
-        # Günlük kesim limitini kontrol et
-        if self.trees_cut_today >= self.max_trees_per_day:
-            self.state = "Günlük Kesim Limiti Doldu"
-            self.wander()
-            return
-            
-        # Eğer ağaç kesiyorsa
-        if self.is_cutting and self.target_tree:
-            # Hareket etmeyi durdur
-            self.is_moving = False
-            # Durumu güncelle
-            self.state = "Ağaç Kesiyor"
-            
-            # Ağaç görünür değilse veya listeden kaldırılmışsa
-            if not self.target_tree.is_visible:
-                self.is_cutting = False
-                print(f"{self.name} ağaç ID: {self.target_tree.id} kesildi, yeni ağaç arıyor.")
-                self.target_tree = None
-                # Kesim sayısını güncelle
-                print(f"{self.name} bugün {self.trees_cut_today}/{self.max_trees_per_day} ağaç kesti.")
-                # Ağaç kesildikten sonra kısa bir süre bekle, sonra yeni ağaç ara
-                QTimer.singleShot(2000, self.find_tree)
-                # Bu arada biraz dolaş
-                self.wander()
-            else:
-                current_time = time.time()
-                if current_time - self.last_cut_time >= 1.0:  # Her saniye hasar ver
-                    self.target_tree.take_damage()
-                    self.last_cut_time = current_time
-            return
-            
-        # Yeni ağaç ara
-        self.find_tree()
-    
-    def find_tree(self):
-        """En yakın uygun ağacı bul"""
-        # Günlük kesim limitini kontrol et
-        if self.trees_cut_today >= self.max_trees_per_day:
-            self.state = "Günlük Kesim Limiti Doldu"
-            self.wander()
-            return
-            
-        if not hasattr(self, 'game_controller') or not self.game_controller.trees:
-            return
-            
-        # Eğer zaten ağaç kesiyorsa yeni ağaç arama
-        if self.is_cutting and self.target_tree:
-            return
-            
-        closest_tree = None
-        min_distance = float('inf')
-        
-        # En yakın kesilebilir ağacı bul
-        for tree in self.game_controller.trees:
-            if tree.is_visible and not tree.is_being_cut:
-                distance = abs(tree.x - self.x)
-                if distance < min_distance:
-                    min_distance = distance
-                    closest_tree = tree
-        
-        # Ağaç bulunduysa
-        if closest_tree:
-            if min_distance < 45:  # Kesme mesafesini artır
-                if closest_tree.start_cutting(self):  # Kesmeye başla
-                    self.target_tree = closest_tree
-                    self.is_cutting = True
-                    self.is_moving = False
-                    self.last_cut_time = time.time()
-                    
-                    # Animasyon ayarlarını güncelle
-                    self.rotation_speed = 0.4  # Daha hızlı dönme efekti
-                    self.max_rotation = 30  # Daha büyük eğilme açısı
-                    self.rotation_interval = 0.7  # Daha hızlı sallanma aralığı
-                    self.last_rotation_time = time.time()
-                    
-                    self.state = "Ağaç Kesiyor"
-                    print(f"{self.name} ağaç kesmeye başladı. Ağaç ID: {closest_tree.id}")
-            else:  # Ağaca doğru git
-                self.move_towards(closest_tree.x)
-                self.state = "Ağaca Gidiyor"
-                print(f"{self.name} ağaca doğru ilerliyor. Mesafe: {min_distance:.1f}")
-        else:
-            self.wander()  # Ağaç yoksa dolaş
-            self.state = "Ağaç Arıyor"
-    
-    def move_towards(self, target_x):
-        """Hedefe doğru hareket et"""
-        self.is_moving = True
-        self.is_cutting = False
-        
-        # Her frame'de daha fazla hareket
-        move_step = self.speed * 1.5  # Hareket adımını 1.5 kat artır
-        
-        if target_x > self.x:
-            self.direction = 1
-            self.direction_x = 1  # Sağa doğru
-            self.x += move_step
-        else:
-            self.direction = -1
-            self.direction_x = -1  # Sola doğru
-            self.x -= move_step
-    
-    def wander(self):
-        """Rastgele dolaş"""
-        if not self.is_moving or abs(self.target_x - self.x) < 5:
-            # Yeni hedef belirle - daha geniş mesafe
-            new_x = self.x + random.choice([-1, 1]) * random.randint(150, 300)  # 100-200 yerine 150-300
-            new_x = max(100, min(1820, new_x))  # Ekran sınırları
-            self.target_x = new_x
-            self.is_moving = True
-            self.state = "Dolaşıyor"
-        
-        # Hedefe doğru hareket et
-        self.move_towards(self.target_x)
     
     def go_home(self):
         """Eve veya kaleye dön"""
@@ -728,186 +576,35 @@ class Villager:
         except Exception as e:
             print(f"HATA: İlişki azaltma hatası: {e}")
 
-    def handle_woodcutter_market(self):
-        """Oduncunun pazar davranışı"""
-        try:
-            current_time = time.time()
-            
-            # Bekleme süresi dolduysa
-            if current_time - self.market_visit_cooldown < 10.0 and self.market_visit_cooldown > 0:
-                self.wander()  # Biraz dolaş
-                self.state = "Pazara Gitmek için Bekliyor"
-                return
-                
-            # Oyun kontrolcüsü var mı kontrol et
-            if not hasattr(self, 'game_controller') or not self.game_controller:
-                self.wander()
-                return
-                
-            # Pazar alanı var mı kontrol et
-            if not hasattr(self.game_controller, 'market') or not self.game_controller.market:
-                self.wander()
-                return
-                
-            market = self.game_controller.market
-            
-            # Zaten bir tezgahım var mı?
-            if self.has_market_stall and self.current_stall:
-                # Satış yapıyor
-                self.is_selling = True
-                self.is_moving = False
-                self.state = "Pazarda Satış Yapıyor"
-                
-                # 30 saniye sonra tezgahı bırak
-                if current_time - self.last_trade_time > 30.0:
-                    self.release_market_stall()
-                    self.market_visit_cooldown = current_time
-                    self.state = "Pazardan Ayrılıyor"
-                    self.wander()
-                
-                return
-                
-            # Pazara doğru git
-            distance_to_market = abs(market.x - self.x)
-            
-            if distance_to_market < 30:  # Pazara ulaştıysa
-                # Boş bir odun tezgahı bul
-                available_stall = market.find_available_stall("odun")
-                
-                if available_stall:
-                    # Tezgahı kiralamayı dene
-                    if available_stall.set_owner(self):
-                        self.has_market_stall = True
-                        self.current_stall = available_stall
-                        self.is_selling = True
-                        self.is_moving = False
-                        self.state = "Pazarda Odun Satıyor"
-                        self.last_trade_time = current_time
-                        
-                        # Odunları tezgaha ekle (10 odun başına bir odun ekle)
-                        wood_to_sell = self.trees_cut_today * 10
-                        self.current_stall.add_inventory(wood_to_sell)
-                        print(f"{self.name} tezgaha {wood_to_sell} odun koydu!")
-                        
-                        # Ağaç kesme sayısını sıfırla
-                        self.trees_cut_today = 0
-                else:
-                    # Boş tezgah yoksa biraz dolaş ve sonra tekrar dene
-                    self.wander()
-                    self.state = "Boş Tezgah Arıyor"
-                    self.market_visit_cooldown = current_time
-            else:
-                # Pazara git
-                self.move_towards(market.x)
-                self.state = "Pazara Gidiyor"
-                
-        except Exception as e:
-            print(f"HATA: {self.name} pazar davranışı hatası: {e}")
-            import traceback
-            traceback.print_exc()
+    def move_towards(self, target_x):
+        """Hedefe doğru hareket et"""
+        self.is_moving = True
+        self.is_cutting = False
+        
+        # Her frame'de daha fazla hareket
+        move_step = self.speed * 1.5  # Hareket adımını 1.5 kat artır
+        
+        if target_x > self.x:
+            self.direction = 1
+            self.direction_x = 1  # Sağa doğru
+            self.x += move_step
+        else:
+            self.direction = -1
+            self.direction_x = -1  # Sola doğru
+            self.x -= move_step
     
-    def handle_builder_market(self):
-        """İnşaatçının pazar davranışı"""
-        try:
-            current_time = time.time()
-            
-            # Bekleme süresi dolduysa
-            if current_time - self.market_visit_cooldown < 10.0 and self.market_visit_cooldown > 0:
-                self.wander()  # Biraz dolaş
-                self.state = "Pazara Gitmek için Bekliyor"
-                return
-                
-            # Oyun kontrolcüsü var mı kontrol et
-            if not hasattr(self, 'game_controller') or not self.game_controller:
-                self.wander()
-                return
-                
-            # Pazar alanı var mı kontrol et
-            if not hasattr(self.game_controller, 'market') or not self.game_controller.market:
-                self.wander()
-                return
-                
-            market = self.game_controller.market
-            
-            # İnşaatçı satış da yapabilir (ev satışı)
-            if self.has_market_stall and self.current_stall:
-                # Satış yapıyor
-                self.is_selling = True
-                self.is_moving = False
-                self.state = "Pazarda Ev Satıyor"
-                
-                # 30 saniye sonra tezgahı bırak
-                if current_time - self.last_trade_time > 30.0:
-                    self.release_market_stall()
-                    self.market_visit_cooldown = current_time
-                    self.state = "Pazardan Ayrılıyor"
-                    self.wander()
-                
-                return
-            
-            # Pazara doğru git
-            distance_to_market = abs(market.x - self.x)
-            
-            if distance_to_market < 30:  # Pazara ulaştıysa
-                # Odun almak mı yoksa ev satmak mı?
-                wood_to_buy = min(4, self.money // 5)  # En fazla 4 odun, paranın yettiği kadar
-                
-                if wood_to_buy > 0:  # Odun alacak parası varsa
-                    # Aktif bir odun tezgahı var mı kontrol et
-                    active_wood_stall = market.find_active_stall("odun")
-                    
-                    if active_wood_stall and active_wood_stall.owner != self:
-                        # Tezgahta yeterli odun var mı kontrol et
-                        if active_wood_stall.has_enough_inventory(wood_to_buy):
-                            # Odun satın al
-                            seller = active_wood_stall.owner
-                            if market.process_transaction(self, seller, "odun", wood_to_buy):
-                                # İşlem başarılı olduysa kale envanterine odunları ekle
-                                if hasattr(self.game_controller, 'castle') and self.game_controller.castle:
-                                    self.game_controller.castle.add_to_inventory("odun", wood_to_buy)
-                                    print(f"{self.name} kale envanterine {wood_to_buy} odun ekledi!")
-                                
-                                # Biraz bekle
-                                self.market_visit_cooldown = current_time
-                                self.state = "Odun Satın Aldı"
-                            else:
-                                self.state = "Odun Satın Alma Başarısız"
-                        else:
-                            self.state = "Yeterli Odun Yok"
-                    else:
-                        # Odun tezgahı yoksa kendi tezgahını açmayı dene (ev satışı)
-                        available_stall = market.find_available_stall("ev")
-                        
-                        if available_stall:
-                            if available_stall.set_owner(self):
-                                self.has_market_stall = True
-                                self.current_stall = available_stall
-                                self.is_selling = True
-                                self.is_moving = False
-                                self.state = "Pazarda Ev Satıyor"
-                                self.last_trade_time = current_time
-                                
-                                # Satılacak ev sayısını tezgaha ekle
-                                houses_to_sell = self.buildings_built
-                                self.current_stall.add_inventory(houses_to_sell)
-                                print(f"{self.name} tezgaha {houses_to_sell} ev koydu!")
-                        else:
-                            self.wander()
-                            self.state = "Boş Tezgah Arıyor"
-                else:
-                    # Parası yoksa veya odun almak istemiyorsa biraz dolaş
-                    self.wander()
-                    self.state = "Odun Alma Parası Yok"
-                    self.market_visit_cooldown = current_time
-            else:
-                # Pazara git
-                self.move_towards(market.x)
-                self.state = "Pazara Gidiyor"
-                
-        except Exception as e:
-            print(f"HATA: {self.name} inşaatçı pazar davranışı hatası: {e}")
-            import traceback
-            traceback.print_exc()
+    def wander(self):
+        """Rastgele dolaş"""
+        if not self.is_moving or abs(self.target_x - self.x) < 5:
+            # Yeni hedef belirle - daha geniş mesafe
+            new_x = self.x + random.choice([-1, 1]) * random.randint(150, 300)  # 100-200 yerine 150-300
+            new_x = max(100, min(1820, new_x))  # Ekran sınırları
+            self.target_x = new_x
+            self.is_moving = True
+            self.state = "Dolaşıyor"
+        
+        # Hedefe doğru hareket et
+        self.move_towards(self.target_x)
     
     def handle_house_buying(self):
         """Ev satın alma davranışı"""
@@ -925,53 +622,59 @@ class Villager:
                 self.wander()
                 return
                 
-            # Pazar alanı var mı kontrol et
-            if not hasattr(self.game_controller, 'market') or not self.game_controller.market:
-                self.wander()
-                return
-                
-            market = self.game_controller.market
-            
             # Zaten ev sahibiyse dolaş
             if self.has_house:
                 self.wander()
                 self.state = "Dolaşıyor"
                 return
                 
-            # Pazara doğru git
-            distance_to_market = abs(market.x - self.x)
+            # Evi satın almak için 100 altın gerekiyor
+            if self.money < 100:
+                self.wander()
+                self.state = "Ev Almak İçin Para Biriktiriyor"
+                return
             
-            if distance_to_market < 30:  # Pazara ulaştıysa
-                # Aktif bir ev tezgahı var mı kontrol et
-                active_house_stall = market.find_active_stall("ev")
+            # Satılık ev var mı kontrol et
+            houses_for_sale = [h for h in self.game_controller.houses if hasattr(h, 'for_sale') and h.for_sale]
+            
+            if not houses_for_sale:
+                self.wander()
+                self.state = "Satılık Ev Arıyor"
+                return
+            
+            # Kaleye doğru git (evi almak için krala yaklaş)
+            if hasattr(self.game_controller, 'castle') and self.game_controller.castle:
+                castle = self.game_controller.castle
+                distance_to_castle = abs(castle.x - self.x)
                 
-                if active_house_stall and active_house_stall.owner != self:
-                    # Tezgahta ev var mı kontrol et
-                    if active_house_stall.has_enough_inventory(1):
-                        # Ev satın al
-                        seller = active_house_stall.owner
-                        
-                        # Paranın yetip yetmediğini ve pazarlık durumunu kontrol et
-                        if market.process_transaction(self, seller, "ev", 1):
-                            # İşlem başarılı olduysa yeni bir ev oluştur ve kendine ata
-                            self.create_house_for_self()
-                            
-                            # Biraz bekle
-                            self.market_visit_cooldown = current_time
-                            self.state = "Ev Satın Aldı"
-                        else:
-                            self.state = "Ev Satın Alma Başarısız"
-                    else:
-                        self.state = "Satılık Ev Yok"
-                else:
-                    # Ev tezgahı yoksa dolaş
-                    self.wander()
-                    self.state = "Satılık Ev Arıyor"
+                if distance_to_castle < 30:  # Kaleye ulaştıysa
+                    # En yakın satılık evi bul
+                    closest_house = min(houses_for_sale, key=lambda h: abs(h.x - self.x))
+                    
+                    # Evi satın al
+                    self.money -= 100  # 100 altın öde
+                    closest_house.set_owner(self.name)
+                    self.has_house = True
+                    self.house_id = closest_house.id
+                    
+                    # Ödemeyi inşaatçıya yap
+                    if hasattr(closest_house, 'builder') and closest_house.builder:
+                        closest_house.builder.money += 100
+                        print(f"{self.name}, ev için 100 altını inşaatçı {closest_house.builder.name}'ye ödedi!")
+                    
+                    self.state = "Ev Satın Aldı"
+                    print(f"{self.name} kraldan evi satın aldı! Kalan para: {self.money} altın")
+                    
+                    # Biraz bekle
                     self.market_visit_cooldown = current_time
+                else:
+                    # Kaleye git
+                    self.move_towards(castle.x)
+                    self.state = "Ev Almak İçin Kaleye Gidiyor"
             else:
-                # Pazara git
-                self.move_towards(market.x)
-                self.state = "Pazara Gidiyor"
+                # Kale yoksa dolaş
+                self.wander()
+                self.state = "Kaleyi Arıyor"
                 
         except Exception as e:
             print(f"HATA: {self.name} ev satın alma davranışı hatası: {e}")
@@ -1026,67 +729,137 @@ class Villager:
             self.current_stall = None
             self.is_selling = False
             print(f"{self.name} pazar tezgahını serbest bıraktı.")
-            
 
-class TestVillager(Villager):
-    def __init__(self, x, y):
-        super().__init__(
-            name="Test Köylüsü",
-            gender="Erkek",
-            profession="Test",
-            appearance=0,
-            x=x,
-            y=y
-        )  # Tüm gerekli parametreleri veriyorum
-        self.health = 100
-        self.money = 50
-        self.happiness = 75
-        self.charisma = 60
-        self.education = 80
-        self.traits = ["Test Özelliği"]
-
-        # Diğer özellikler
-        self.direction = 1  # 1: sağa, -1: sola
-        self.speed = 1.0  # Sabit hız
-        self.rotation = 0  # Eğilme açısı
-        self.max_rotation = 10  # Maksimum eğilme açısı
-        self.last_rotation_time = time.time()  # Son eğilme zamanı
-        self.rotation_direction = 1  # 1: sağa eğil, -1: sola eğil
-        self.rotation_interval = 0.3  # Her 0.3 saniyede bir yön değiştir
-        
-        print(f"Test köylüsü oluşturuldu: ({self.x}, {self.y})")
-    
-    def move(self):
-        """Köylüyü hareket ettir ve eğilme animasyonunu güncelle"""
+    def handle_woodcutter(self):
+        """Oduncu davranışı"""
         try:
-            # Yatay hareket
-            self.x += self.speed * self.direction
+            # Günlük limit kontrolü
+            if self.trees_cut_today >= self.max_trees_per_day:
+                self.state = "Günlük Ağaç Limiti Doldu"
+                self.wander()
+                return
             
-            # Sınırlara gelince yön değiştir
-            if self.x < 100 or self.x > 1820:
-                self.direction *= -1
+            # Eğer kesim yapılıyorsa kontrol et
+            if self.is_cutting and self.target_tree:
+                # Ağaç görünür mü?
+                if not self.target_tree.is_visible:
+                    # Ağaç kesilmiş, yeni ağaç ara
+                    self.is_cutting = False
+                    self.target_tree = None
+                    return
+                
+                # Kesim süresi kontrolü
+                current_time = time.time()
+                elapsed_time = current_time - self.cutting_start_time
+                
+                # Kesim 10 saniye sürüyor
+                if elapsed_time >= 10.0:
+                    # Kesim tamamlandı
+                    self.is_cutting = False
+                    
+                    # Ağacı kaldır
+                    self.target_tree.is_visible = False
+                    
+                    # Odun stoğuna ekle
+                    if hasattr(self.game_controller, 'market') and self.game_controller.market:
+                        market = self.game_controller.market
+                        market.add_wood(10)  # Her ağaçtan 10 odun
+                        print(f"{self.name} ağacı kesti! Pazara 10 odun eklendi. Toplam stok: {market.wood_stock}")
+                    
+                    # Kale envanterine de odun ekle
+                    if hasattr(self.game_controller, 'castle') and self.game_controller.castle:
+                        self.game_controller.castle.add_to_inventory("odun", 10)  # Her ağaçtan 10 odun
+                        print(f"{self.name} ağacı kesti! Kale envanterine 10 odun eklendi.")
+                        # Kontrol paneli güncellemesi için
+                        if hasattr(self.game_controller, 'control_panel') and self.game_controller.control_panel:
+                            self.game_controller.control_panel.update_castle_inventory()
+                    
+                    # Kesilen ağaç sayısını artır
+                    self.trees_cut_today += 1
+                    print(f"{self.name} bugün toplam {self.trees_cut_today}/{self.max_trees_per_day} ağaç kesti.")
+                    
+                    # Hedefi temizle
+                    self.target_tree = None
+                    
+                    # Günlük limit kontrolü
+                    if self.trees_cut_today >= self.max_trees_per_day:
+                        self.state = "Günlük Ağaç Limiti Doldu"
+                        print(f"{self.name} günlük ağaç kesim limitine ulaştı.")
+                    
+                    return
+                
+                # Kesim devam ediyor
+                self.state = "Ağaç Kesiyor"
+                self.is_moving = False
+                
+                # İlerleme yüzdesini hesapla
+                progress = int((elapsed_time / 10.0) * 100)
+                self.target_tree.cut_progress = progress
+                
+                return
             
-            # Eğilme animasyonunu güncelle
-            current_time = time.time()
-            time_diff = current_time - self.last_rotation_time
+            # Eğer kesim yapılmıyorsa ağaç ara
+            # En yakın ağacı bul
+            closest_tree = self.find_closest_tree()
             
-            # Her rotation_interval sürede bir yön değiştir
-            if time_diff >= self.rotation_interval:
-                self.rotation_direction *= -1
-                self.last_rotation_time = current_time
-            
-            # Yumuşak geçiş için progress hesapla (0-1 arası)
-            progress = time_diff / self.rotation_interval
-            
-            # Eğilme açısını hesapla
-            target_rotation = self.max_rotation * self.rotation_direction
-            self.rotation = target_rotation * progress
-            
-            # Debug bilgisi
-            if time_diff >= 0.1:  # Her 0.1 saniyede bir yazdır
-                print(f"Test köylüsü: x={self.x:.1f}, rotation={self.rotation:.1f}°")
-            
+            if closest_tree:
+                # Ağaca git ve kesmeye başla
+                distance = abs(closest_tree.x - self.x)
+                
+                if distance < 45:  # Kesme mesafesi
+                    # Kesmeye başla
+                    self.state = "Ağaç Kesiyor"
+                    self.target_tree = closest_tree
+                    self.is_cutting = True
+                    self.is_moving = False
+                    self.cutting_start_time = time.time()
+                    
+                    # Ağacı kesme moduna geçir
+                    closest_tree.is_being_cut = True
+                    
+                    print(f"{self.name} ağaç kesmeye başladı. ID: {closest_tree.id}")
+                else:
+                    # Ağaca yaklaş
+                    self.state = "Ağaca Yaklaşıyor"
+                    self.move_towards(closest_tree.x)
+            else:
+                # Ağaç bulunamadı, dolaş
+                self.state = "Ağaç Arıyor"
+                self.wander()
+        
         except Exception as e:
-            print(f"Test köylüsü hareket hatası: {e}")
+            print(f"HATA (Oduncu): {self.name} - {e}")
             import traceback
-            traceback.print_exc() 
+            traceback.print_exc()
+            self.wander()
+
+    def find_closest_tree(self):
+        """En yakın ağacı bul"""
+        try:
+            if not hasattr(self.game_controller, 'trees'):
+                return None
+            
+            # Kesilebilir ağaçları bul (görünür ve kesilmemiş)
+            available_trees = [tree for tree in self.game_controller.trees 
+                              if tree.is_visible and not hasattr(tree, 'is_being_cut') or not tree.is_being_cut]
+            
+            if not available_trees:
+                return None
+            
+            # En yakın ağacı bul
+            closest_tree = None
+            min_distance = float('inf')
+            
+            for tree in available_trees:
+                distance = abs(tree.x - self.x)
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_tree = tree
+            
+            return closest_tree
+        
+        except Exception as e:
+            print(f"HATA (Ağaç Bulma): {e}")
+            import traceback
+            traceback.print_exc()
+            return None 

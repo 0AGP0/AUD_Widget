@@ -1,0 +1,940 @@
+# ÇAĞ KRALLIKLARI: TEKNİK TASARIM VE UYGULAMA PLANI
+
+## 1. TEMEL SINIF YAPILARI VE VERİ MODELLERİ
+
+### 1.1. Dünya ve Çevre Sistemi
+```python
+class World:
+    def __init__(self, width, height):
+        self.width = width  # Dünya genişliği (piksel)
+        self.height = height  # Dünya yüksekliği (piksel)
+        self.biomes = []  # Biyom listesi
+        self.regions = {}  # Bölgeler sözlüğü {id: Region}
+        self.weather_system = WeatherSystem()  # Hava durumu sistemi
+        self.time_system = TimeSystem()  # Zaman sistemi (gündüz/gece döngüsü)
+        self.hidden_areas = []  # Gizli bölgeler
+
+class Biome:
+    def __init__(self, biome_type, resources, difficulty):
+        self.type = biome_type  # Biyom tipi (orman, dağ, çöl vs.)
+        self.resources = resources  # Biyomda bulunan kaynaklar
+        self.difficulty = difficulty  # Zorluk seviyesi
+        self.tiles = []  # Biyomu oluşturan kareler
+
+class Region:
+    def __init__(self, id, name, biome, owner=None):
+        self.id = id  # Bölge ID'si
+        self.name = name  # Bölge adı
+        self.biome = biome  # Bölgenin biyom tipi
+        self.owner = owner  # Bölgeyi kontrol eden krallık
+        self.buildings = []  # Bölgedeki yapılar
+        self.villagers = []  # Bölgedeki köylüler
+        self.resources = {}  # Bölge kaynakları
+
+class WeatherSystem:
+    def __init__(self):
+        self.current_weather = "clear"  # Mevcut hava durumu
+        self.weather_effects = {}  # Hava etkisi sözlüğü
+        self.weather_change_probability = 0.05  # Hava değişim olasılığı
+        
+    def update(self, world_time):
+        # Zaman ve mevsime dayalı hava durumunu güncelle
+        # Olasılıksal hava değişimi algoritması
+```
+
+### 1.2. Köylü ve Karakter Sistemi
+```python
+class Villager:
+    def __init__(self, id, name, gender, age):
+        self.id = id  # Benzersiz ID
+        self.name = name  # İsim
+        self.gender = gender  # Cinsiyet
+        self.age = age  # Yaş
+        self.health = 100  # Sağlık
+        self.happiness = 100  # Mutluluk
+        self.energy = 100  # Enerji
+        self.position = (0, 0)  # Dünya konumu (x, y)
+        self.home = None  # Ev referansı
+        self.class_type = None  # Köylü sınıfı
+        self.skills = {}  # Yetenekler {skill_name: level}
+        self.inventory = Inventory()  # Envanter
+        self.relationships = {}  # İlişkiler {villager_id: relationship_score}
+        self.traits = []  # Karakter özellikleri
+        self.daily_routine = []  # Günlük rutin görevler
+        self.goals = []  # Uzun vadeli hedefler
+        self.appearance = {}  # Görünüm özellikleri
+        self.is_alive = True  # Hayatta mı?
+        
+    def update(self, delta_time):
+        # Her kare köylüyü güncelle
+        self.update_needs(delta_time)
+        self.update_goals()
+        self.perform_current_action(delta_time)
+        self.update_relationships()
+        
+    def make_decision(self):
+        # Yapay zeka karar algoritması
+        # İhtiyaçlar, hedefler ve çevresel faktörlere dayanarak eylem seç
+        
+class VillagerClass:
+    def __init__(self, class_name, abilities, equipment_options):
+        self.name = class_name  # Sınıf adı
+        self.abilities = abilities  # Özel yetenekler
+        self.equipment = equipment_options  # Ekipman seçenekleri
+        self.skill_bonuses = {}  # Yetenek bonusları
+        
+    def apply_class_to_villager(self, villager):
+        # Köylüye sınıf özelliklerini uygula
+        villager.class_type = self.name
+        # Sınıf bazlı yetenekleri ve ekipmanları ayarla
+
+class SkillSystem:
+    def __init__(self):
+        self.skill_types = []  # Mevcut yetenek türleri
+        self.experience_thresholds = {}  # Seviye başına gereken deneyim
+        
+    def gain_experience(self, villager, skill_name, amount):
+        # Yetenek deneyimi kazandır ve seviye atlamaları kontrol et
+        current_exp = villager.skills.get(skill_name, 0)
+        new_exp = current_exp + amount
+        # Seviye hesapla ve güncelle
+```
+
+### 1.3. Krallık Yönetim Sistemi
+```python
+class Kingdom:
+    def __init__(self, id, name, ruler):
+        self.id = id  # Krallık ID'si
+        self.name = name  # Krallık adı
+        self.ruler = ruler  # Yönetici referansı (oyuncu)
+        self.regions = []  # Kontrol edilen bölgeler
+        self.villagers = []  # Krallık köylüleri
+        self.resources = {}  # Krallık kaynakları
+        self.treasury = 1000  # Hazinedeki altın
+        self.reputation = 50  # İtibar (0-100)
+        self.laws = []  # Yürürlükteki kanunlar
+        self.diplomatic_relations = {}  # {kingdom_id: relation_score}
+        self.research_points = 0  # Araştırma puanları
+        self.technologies = []  # Açılmış teknolojiler
+        
+    def collect_taxes(self):
+        # Vergi toplama sistemi
+        # Köylü sayısı, binalar ve itibar bazlı hesaplama
+        
+    def update_economy(self, delta_time):
+        # Ekonomik simülasyon
+        # Üretim, tüketim ve ticaret hesaplamaları
+        
+    def handle_diplomatic_actions(self, action_type, target_kingdom):
+        # Diplomatik eylemleri işle (ittifak teklifi, savaş ilanı vb.)
+```
+
+### 1.4. İnşaat ve Geliştirme Sistemi
+```python
+class Building:
+    def __init__(self, building_type, position, owner):
+        self.type = building_type  # Bina tipi
+        self.position = position  # Konum (x, y)
+        self.owner = owner  # Sahip (köylü veya krallık)
+        self.health = 100  # Sağlık durumu
+        self.level = 1  # Seviye
+        self.workers = []  # Çalışan köylüler
+        self.production = {}  # Üretim veriler
+        self.storage = {}  # Depolama kapasitesi
+        self.construction_progress = 0  # İnşaat ilerlemesi (0-100)
+        self.is_completed = False  # Tamamlandı mı?
+        
+    def update(self, delta_time):
+        # Binayı güncelle (üretim, hasar, iyileştirme)
+        if not self.is_completed:
+            self.update_construction(delta_time)
+        else:
+            self.produce_resources(delta_time)
+            
+    def upgrade(self):
+        # Binayı yükselt (maliyet, süre, yeni özellikler)
+
+class BuildingManager:
+    def __init__(self, kingdom):
+        self.kingdom = kingdom  # Bağlı krallık
+        self.building_types = {}  # Bina türleri ve özellikleri
+        self.construction_queue = []  # İnşaat sırası
+        
+    def start_construction(self, building_type, position):
+        # Yeni bina inşaatı başlat
+        # Kaynak ve arazi kontrollerini yap
+        
+    def assign_workers(self, building, villagers):
+        # Binaya işçi ata
+        # Verimlilik hesaplamaları
+```
+
+## 2. ALGORITMA VE SİSTEM AÇIKLAMALARI
+
+### 2.1. Yapay Zeka ve Karar Sistemleri
+
+#### 2.1.1. Köylü Yapay Zekası
+```
+ALGORITMA: Köylü Karar Mekanizması
+
+1. İhtiyaçları değerlendir (açlık, yorgunluk, mutluluk vb.)
+   a. Her ihtiyaç için aciliyet puanı hesapla: 
+      aciliyet = (100 - ihtiyaç_değeri) * ihtiyaç_ağırlığı
+   b. En acil ihtiyacı tespit et
+
+2. Mevcut hedefleri kontrol et
+   a. Kısa vadeli hedefler için ilerlemeyi güncelle
+   b. Uzun vadeli hedefler için adımları kontrol et
+   c. Hedef önceliğini hesapla: 
+      öncelik = hedef_önem * (1 - hedef_ilerleme / 100)
+
+3. Çevresel faktörleri analiz et
+   a. Yakındaki tehlikeler, kaynaklar, diğer köylüler
+   b. Konuma bağlı fırsatlar ve kısıtlamalar
+   c. Günün saati ve hava durumu etkileri
+
+4. Karar verme
+   a. Eğer acil ihtiyaç (aciliyet > 70) varsa, ihtiyacı karşıla
+   b. Yoksa, en yüksek öncelikli hedefi takip et
+   c. Hiçbiri yoksa, günlük rutini takip et veya keşif yap
+
+5. Eylem planı oluştur
+   a. Hedef konuma gitmek için yol bul
+   b. Gereken kaynakları ve araçları hazırla
+   c. Eylemi gerçekleştir ve sonuçları değerlendir
+```
+
+#### 2.1.2. Krallık Ekonomisi Simulasyonu
+```
+ALGORITMA: Ekonomik Simülasyon Döngüsü
+
+1. Kaynak Üretimi
+   a. Her üretim binası için:
+      i. Çalışan verimliliğini hesapla: 
+         verimlilik = temel_üretim * (1 + çalışan_beceri / 100) * bina_seviyesi * hava_faktörü
+      ii. Üretilen kaynak miktarını hesapla:
+         üretim = verimlilik * delta_zaman
+      iii. Kaynakları depoya ekle
+
+2. Tüketim
+   a. Her köylü için:
+      i. Günlük yiyecek ve temel ihtiyaçları hesapla
+      ii. Krallık depolarından düş
+      iii. Eksikse, açlık ve mutluluk cezaları uygula
+
+3. Ticaret ve Pazar Dinamikleri
+   a. Arz-talep dengesi hesapla:
+      arz_talep_oranı = toplam_arz / (toplam_talep + 0.1)
+   b. Her kaynak için fiyat güncelle:
+      yeni_fiyat = temel_fiyat * (2 - arz_talep_oranı)
+   c. Ticaret tekliflerini değerlendir ve işlemleri gerçekleştir
+
+4. Vergi ve Giderler
+   a. Düzenli gelir hesapla (vergiler, kira vb.)
+   b. Düzenli giderleri düş (asker maaşları, bakım masrafları vb.)
+   c. Hazineyi güncelle
+
+5. Ekonomik Göstergeleri Güncelle
+   a. Refah seviyesi, işsizlik oranı, büyüme hızı
+   b. Ekonomik krizleri ve fırsatları tespit et
+```
+
+### 2.2. Sosyal İlişki Algoritmaları
+
+#### 2.2.1. İlişki Sistemi
+```python
+class Relationship:
+    def __init__(self, villager1_id, villager2_id):
+        self.villager1_id = villager1_id
+        self.villager2_id = villager2_id
+        self.affinity = 0  # -100 (nefret) ile 100 (sevgi) arası
+        self.trust = 0  # Güven seviyesi
+        self.interaction_history = []  # Geçmiş etkileşimler
+        self.relationship_type = "stranger"  # stranger, friend, rival, lover, spouse
+        
+    def update_after_interaction(self, interaction_type, quality):
+        # Etkileşim sonrası ilişkiyi güncelle
+        # Etkileşim türü ve kalitesine göre puanları değiştir
+        
+        # Örnek algoritma:
+        trait_compatibility = calculate_trait_compatibility()
+        affinity_change = base_change * quality * trait_compatibility
+        self.affinity += affinity_change
+        
+        # İlişki türünü güncelle
+        self.update_relationship_type()
+        
+    def update_relationship_type(self):
+        # İlişki türünü güncelle
+        if self.affinity > 80 and "romantic" in self.interaction_history:
+            self.relationship_type = "lover"
+        elif self.affinity > 60:
+            self.relationship_type = "friend"
+        elif self.affinity < -60:
+            self.relationship_type = "rival"
+        # ... diğer ilişki türleri
+
+def calculate_trait_compatibility(villager1, villager2):
+    # İki köylünün özellikleri arasındaki uyumu hesapla
+    compatible_traits = 0
+    incompatible_traits = 0
+    
+    for trait1 in villager1.traits:
+        for trait2 in villager2.traits:
+            if (trait1, trait2) in COMPATIBLE_TRAITS:
+                compatible_traits += 1
+            elif (trait1, trait2) in INCOMPATIBLE_TRAITS:
+                incompatible_traits += 1
+                
+    compatibility = (compatible_traits - incompatible_traits) / max(len(villager1.traits), len(villager2.traits))
+    return 1 + compatibility  # 0.5 ile 1.5 arası bir çarpan
+```
+
+#### 2.2.2. Sosyal Etkinlik Sistemi
+```python
+class SocialEvent:
+    def __init__(self, event_type, location, duration):
+        self.type = event_type  # Festival, düğün, toplantı vb.
+        self.location = location  # Etkinliğin gerçekleştiği konum
+        self.duration = duration  # Süre (saat)
+        self.participants = []  # Katılımcılar
+        self.effects = {}  # Etkinlik etkileri
+        self.requirements = {}  # Etkinlik gereksinimleri
+        
+    def calculate_success(self):
+        # Etkinliğin başarısını hesapla
+        success_score = base_score
+        
+        # Katılımcıların becerilerine göre başarı artışı
+        for participant in self.participants:
+            if self.type in participant.skills:
+                success_score += participant.skills[self.type] * 0.5
+                
+        # Kaynak ve konum uygunluğu
+        if self.check_resources():
+            success_score *= 1.25
+        else:
+            success_score *= 0.75
+            
+        return success_score
+        
+    def apply_effects(self):
+        # Etkinlik etkilerini uygula
+        for participant in self.participants:
+            # Mutluluk, ilişki, itibar vb. etkileri uygula
+            participant.happiness += self.effects.get("happiness", 0)
+            
+            # İkili ilişkileri güncelle
+            for other in self.participants:
+                if other.id != participant.id:
+                    relationship = get_relationship(participant.id, other.id)
+                    relationship.affinity += self.effects.get("relationship", 0)
+```
+
+### 2.3. Savaş ve Mücadele Sistemi
+```python
+class CombatSystem:
+    def __init__(self):
+        self.attack_types = {}  # Saldırı türleri ve özellikleri
+        self.defense_types = {}  # Savunma türleri ve özellikleri
+        
+    def calculate_damage(self, attacker, defender, attack_type):
+        # Hasar hesaplama formülü
+        base_damage = attacker.get_attack_power(attack_type)
+        defense = defender.get_defense_power(attack_type)
+        
+        # Beceri ve ekipman etkileri
+        skill_modifier = 1 + (attacker.skills.get(attack_type, 0) / 100)
+        equipment_bonus = attacker.get_equipment_attack_bonus(attack_type)
+        
+        # Savunma ve zırh etkileri
+        defense_skill = 1 + (defender.skills.get("defense", 0) / 100)
+        armor_bonus = defender.get_armor_defense_bonus(attack_type)
+        
+        # Nihai hasar hesaplaması
+        damage = (base_damage * skill_modifier + equipment_bonus) - (defense * defense_skill + armor_bonus)
+        damage = max(1, damage)  # En az 1 hasar
+        
+        # Kritik vuruş kontrolü
+        if random.random() < attacker.get_critical_chance(attack_type):
+            damage *= 1.5
+            
+        return int(damage)
+        
+    def resolve_combat_round(self, attacker, defender):
+        # Savaş turu çözümleme
+        attack_type = attacker.choose_attack()
+        damage = self.calculate_damage(attacker, defender, attack_type)
+        
+        # Hasarı uygula
+        defender.health -= damage
+        
+        # Karşı saldırı kontrolü
+        if defender.health > 0 and random.random() < defender.get_counter_chance():
+            counter_damage = self.calculate_damage(defender, attacker, defender.choose_attack())
+            attacker.health -= counter_damage
+            
+        # Savaş sonucunu değerlendir
+        if defender.health <= 0:
+            return "attacker_won"
+        elif attacker.health <= 0:
+            return "defender_won"
+        else:
+            return "ongoing"
+```
+
+## 3. VERİ AKIŞI VE ENTEGRASYON
+
+### 3.1. Veri Depolama Yapısı
+```python
+class GameData:
+    def __init__(self):
+        self.world = None  # Dünya verisi
+        self.kingdoms = {}  # Krallıklar {id: Kingdom}
+        self.villagers = {}  # Tüm köylüler {id: Villager}
+        self.buildings = {}  # Tüm binalar {id: Building}
+        self.relationships = {}  # İlişkiler {(id1, id2): Relationship}
+        self.events = []  # Etkinlikler
+        self.game_time = 0  # Oyun zamanı (saat)
+        self.game_day = 1  # Oyun günü
+        self.game_year = 1  # Oyun yılı
+        
+    def save_to_file(self, filename):
+        # Oyun verilerini dosyaya kaydet (JSON/SQL/binary)
+        pass
+        
+    def load_from_file(self, filename):
+        # Oyun verilerini dosyadan yükle
+        pass
+        
+    def update_world(self, delta_time):
+        # Dünya güncellemesi
+        self.update_time(delta_time)
+        self.world.weather_system.update(self.game_time)
+        
+        # Köylüleri güncelle
+        for villager_id, villager in self.villagers.items():
+            villager.update(delta_time)
+            
+        # Binaları güncelle
+        for building_id, building in self.buildings.items():
+            building.update(delta_time)
+            
+        # Krallıkları güncelle
+        for kingdom_id, kingdom in self.kingdoms.items():
+            kingdom.update_economy(delta_time)
+            
+        # Olayları kontrol et ve yeni olaylar oluştur
+        self.check_event_triggers()
+        
+    def update_time(self, delta_time):
+        # Oyun zamanını güncelle
+        self.game_time += delta_time
+        
+        # Gün değişimini kontrol et
+        if self.game_time >= 24:
+            self.game_time -= 24
+            self.game_day += 1
+            self.on_new_day()
+            
+            # Yıl değişimini kontrol et
+            if self.game_day > 360:  # 360 günlük yıl
+                self.game_day = 1
+                self.game_year += 1
+                self.on_new_year()
+                
+    def on_new_day(self):
+        # Yeni gün etkilerini uygula
+        pass
+        
+    def on_new_year(self):
+        # Yeni yıl etkilerini uygula
+        pass
+```
+
+### 3.2. Çizim ve Görsel Sistem
+```python
+class RenderSystem:
+    def __init__(self, screen_width, screen_height):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.camera_x = 0
+        self.camera_y = 0
+        self.zoom = 1.0
+        self.assets = {}  # Görsel varlıklar
+        
+    def load_assets(self):
+        # Görsel varlıkları yükle (PNG, animasyonlar)
+        pass
+        
+    def render_world(self, world, game_data):
+        # Dünyayı çiz
+        self.render_biomes(world)
+        self.render_buildings(game_data.buildings)
+        self.render_villagers(game_data.villagers)
+        self.render_effects(world.weather_system)
+        
+    def render_biomes(self, world):
+        # Biyomları çiz
+        for biome in world.biomes:
+            for tile in biome.tiles:
+                self.render_tile(tile)
+                
+    def render_buildings(self, buildings):
+        # Binaları çiz
+        for building_id, building in buildings.items():
+            if self.is_visible(building.position):
+                sprite = self.get_building_sprite(building)
+                self.render_sprite(sprite, building.position)
+                
+    def render_villagers(self, villagers):
+        # Köylüleri çiz
+        for villager_id, villager in villagers.items():
+            if self.is_visible(villager.position):
+                sprite = self.get_villager_sprite(villager)
+                self.render_sprite(sprite, villager.position)
+                
+    def is_visible(self, position):
+        # Konum ekranda görünür mü?
+        screen_x = (position[0] - self.camera_x) * self.zoom
+        screen_y = (position[1] - self.camera_y) * self.zoom
+        
+        return (screen_x >= -100 and screen_x <= self.screen_width + 100 and
+                screen_y >= -100 and screen_y <= self.screen_height + 100)
+```
+
+### 3.3. Kullanıcı Arayüzü Sistemi
+```python
+class UserInterface:
+    def __init__(self, screen_width, screen_height):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.active_windows = []  # Aktif pencereler
+        self.buttons = {}  # Düğmeler
+        self.font = None  # Yazı tipi
+        self.control_panel = ControlPanel(self)  # Ana kontrol paneli
+        
+    def render(self):
+        # Ana arayüzü çiz
+        self.render_top_bar()
+        self.render_side_panel()
+        self.control_panel.render()  # Kontrol panelini çiz
+        self.render_active_windows()
+        self.render_buttons()
+        
+    def handle_input(self, event):
+        # Kullanıcı girdilerini işle
+        if self.control_panel.is_event_over_panel(event):
+            self.control_panel.handle_input(event)
+            return True
+        
+        # Diğer UI elemanları için girdi işleme
+        return False
+        
+    def open_window(self, window_type, data=None):
+        # Yeni pencere aç
+        new_window = UIWindow(window_type, data)
+        self.active_windows.append(new_window)
+        return new_window
+        
+    def close_window(self, window):
+        # Pencereyi kapat
+        if window in self.active_windows:
+            self.active_windows.remove(window)
+
+class ControlPanel:
+    def __init__(self, ui_manager):
+        self.ui_manager = ui_manager
+        self.x = 0  # X pozisyonu
+        self.y = 0  # Y pozisyonu
+        self.width = 300  # Panel genişliği
+        self.height = ui_manager.screen_height  # Panel yüksekliği (ekran yüksekliğiyle aynı)
+        self.is_visible = True  # Panel görünür mü?
+        self.is_collapsed = False  # Panel daraltılmış mı?
+        self.sections = []  # Panel bölümleri
+        self.active_tab = 0  # Aktif sekme
+        self.tabs = ["Krallık", "Köylüler", "Binalar", "Kaynaklar", "Diplomasi"]  # Panel sekmeleri
+        
+        # Panel bölümlerini oluştur
+        self.initialize_sections()
+        
+    def initialize_sections(self):
+        # Panel bölümlerini oluştur
+        self.sections = [
+            PanelSection("kingdom_overview", "Krallık Özeti", 0),
+            PanelSection("villagers_list", "Köylüler", 1),
+            PanelSection("buildings_management", "Binalar", 2),
+            PanelSection("resources_overview", "Kaynaklar", 3),
+            PanelSection("diplomacy_view", "Diplomasi", 4)
+        ]
+        
+    def render(self):
+        # Paneli çiz
+        if not self.is_visible:
+            return
+            
+        # Arka planı çiz
+        # Ana panel arkaplanı
+        
+        # Sekme başlıklarını çiz
+        self.render_tabs()
+        
+        # Aktif bölümü çiz
+        if not self.is_collapsed:
+            self.sections[self.active_tab].render(self.x, self.y + 40, self.width, self.height - 40)
+            
+    def render_tabs(self):
+        # Sekme başlıklarını çiz
+        tab_width = self.width / len(self.tabs)
+        
+        for i, tab in enumerate(self.tabs):
+            # Her sekme için arkaplan ve metin çiz
+            tab_x = self.x + (i * tab_width)
+            
+            # Aktif sekme için farklı stil
+            if i == self.active_tab:
+                # Aktif sekme stili
+                pass
+            else:
+                # Normal sekme stili
+                pass
+                
+            # Sekme metnini çiz
+            # Metin çizim kodu
+            
+    def handle_input(self, event):
+        # Girdi işleme
+        # Fare tıklaması
+        if event.type == "MOUSE_BUTTON_DOWN":
+            # Sekme tıklaması kontrolü
+            tab_width = self.width / len(self.tabs)
+            mouse_x, mouse_y = event.pos
+            
+            if self.y <= mouse_y <= self.y + 40:  # Sekme yüksekliği
+                for i in range(len(self.tabs)):
+                    tab_x = self.x + (i * tab_width)
+                    if tab_x <= mouse_x <= tab_x + tab_width:
+                        self.active_tab = i
+                        return True
+                        
+            # Aktif bölüme girdiyi ilet
+            if not self.is_collapsed:
+                return self.sections[self.active_tab].handle_input(event)
+                
+        return False
+        
+    def is_event_over_panel(self, event):
+        # Olay panel üzerinde mi kontrolü
+        if not self.is_visible:
+            return False
+            
+        if hasattr(event, "pos"):
+            mouse_x, mouse_y = event.pos
+            return (self.x <= mouse_x <= self.x + self.width and
+                    self.y <= mouse_y <= self.y + self.height)
+                    
+        return False
+        
+    def toggle_visibility(self):
+        # Panel görünürlüğünü aç/kapat
+        self.is_visible = not self.is_visible
+        
+    def toggle_collapse(self):
+        # Paneli daralt/genişlet
+        self.is_collapsed = not self.is_collapsed
+        
+    def update_kingdom_data(self, kingdom):
+        # Krallık verilerini güncelle
+        for section in self.sections:
+            if section.section_type == "kingdom_overview":
+                section.update_data(kingdom)
+                
+    def update_villagers_data(self, villagers):
+        # Köylü verilerini güncelle
+        for section in self.sections:
+            if section.section_type == "villagers_list":
+                section.update_data(villagers)
+                
+    # Diğer veri güncelleme metodları...
+
+class PanelSection:
+    def __init__(self, section_type, title, tab_index):
+        self.section_type = section_type  # Bölüm tipi
+        self.title = title  # Bölüm başlığı
+        self.tab_index = tab_index  # Sekme indeksi
+        self.elements = []  # UI elemanları
+        self.data = None  # Bölüm verisi
+        self.scroll_offset = 0  # Kaydırma konumu
+        
+    def render(self, x, y, width, height):
+        # Bölümü çiz
+        # Başlık çiz
+        
+        # İçerik tipine göre özel çizim işlemleri
+        if self.section_type == "kingdom_overview":
+            self.render_kingdom_overview(x, y + 30, width, height - 30)
+        elif self.section_type == "villagers_list":
+            self.render_villagers_list(x, y + 30, width, height - 30)
+        # Diğer bölüm tipleri için render metodları...
+        
+    def handle_input(self, event):
+        # Girdi işleme
+        # Fare tıklaması, kaydırma vs.
+        return False
+        
+    def update_data(self, data):
+        # Bölüm verisini güncelle
+        self.data = data
+        
+    def render_kingdom_overview(self, x, y, width, height):
+        # Krallık özet bilgilerini çiz
+        if not self.data:
+            return
+            
+        # Krallık adı, yönetici, hazine, itibar vs. bilgileri çiz
+        
+    def render_villagers_list(self, x, y, width, height):
+        # Köylü listesini çiz
+        if not self.data:
+            return
+            
+        # Her köylü için satır çiz (isim, meslek, sağlık vs.)
+        
+    # Diğer özel render metodları...
+            
+class UIWindow:
+    def __init__(self, window_type, data):
+        self.type = window_type  # Pencere türü
+        self.data = data  # Pencere verisi
+        self.x = 100  # X konumu
+        self.y = 100  # Y konumu
+        self.width = 400  # Genişlik
+        self.height = 300  # Yükseklik
+        self.is_dragging = False  # Sürükleniyor mu?
+        self.elements = []  # UI elementleri
+        
+    def render(self, ui):
+        # Pencereyi çiz
+        pass
+        
+    def handle_input(self, event, ui):
+        # Pencere girdilerini işle
+        pass
+```
+
+## 4. ÇOK OYUNCULU SİSTEM (GELECEK)
+
+### 4.1. Ağ İletişim Yapısı
+```python
+class NetworkManager:
+    def __init__(self, server_address, port):
+        self.server_address = server_address
+        self.port = port
+        self.connection = None
+        self.player_id = None
+        self.connected_players = {}
+        
+    def connect(self):
+        # Sunucuya bağlan
+        pass
+        
+    def disconnect(self):
+        # Sunucudan bağlantıyı kes
+        pass
+        
+    def send_data(self, data_type, payload):
+        # Veri gönder
+        message = {
+            "type": data_type,
+            "player_id": self.player_id,
+            "payload": payload,
+            "timestamp": time.time()
+        }
+        # JSON serileştirme ve gönderme
+        
+    def receive_data(self):
+        # Veri al
+        pass
+        
+    def handle_message(self, message):
+        # Mesaj işleme
+        if message["type"] == "villager_transfer":
+            # Köylü transferini işle
+            self.handle_villager_transfer(message["payload"])
+        elif message["type"] == "trade_offer":
+            # Ticaret teklifini işle
+            self.handle_trade_offer(message["payload"])
+        # ... diğer mesaj türleri
+        
+    def handle_villager_transfer(self, payload):
+        # Köylü transferi işleme
+        villager_data = payload["villager_data"]
+        target_kingdom_id = payload["target_kingdom"]
+        
+        # Köylüyü oluştur ve hedef krallığa ekle
+        new_villager = Villager.from_data(villager_data)
+        game_data.kingdoms[target_kingdom_id].add_villager(new_villager)
+```
+
+### 4.2. Veri Senkronizasyonu
+```python
+class DataSynchronizer:
+    def __init__(self, network_manager, game_data):
+        self.network_manager = network_manager
+        self.game_data = game_data
+        self.last_sync_time = 0
+        self.sync_interval = 5.0  # 5 saniyede bir senkronizasyon
+        
+    def update(self, delta_time):
+        # Periyodik senkronizasyon
+        self.last_sync_time += delta_time
+        if self.last_sync_time >= self.sync_interval:
+            self.sync_data()
+            self.last_sync_time = 0
+            
+    def sync_data(self):
+        # Kritik verileri senkronize et
+        # Sadece değişen verileri gönder
+        changed_data = self.collect_changed_data()
+        if changed_data:
+            self.network_manager.send_data("sync", changed_data)
+            
+    def collect_changed_data(self):
+        # Değişen verileri topla
+        changes = {
+            "kingdom": self.game_data.kingdoms[self.network_manager.player_id].get_public_data(),
+            "villagers": {},
+            "buildings": {},
+            "resources": {}
+        }
+        
+        # Köylülerdeki değişiklikleri topla
+        for villager_id, villager in self.game_data.villagers.items():
+            if villager.is_dirty:
+                changes["villagers"][villager_id] = villager.get_public_data()
+                villager.is_dirty = False
+                
+        return changes
+        
+    def apply_received_changes(self, changes):
+        # Diğer oyunculardan gelen değişiklikleri uygula
+        if "kingdoms" in changes:
+            for kingdom_id, kingdom_data in changes["kingdoms"].items():
+                if kingdom_id in self.game_data.kingdoms:
+                    self.game_data.kingdoms[kingdom_id].update_from_data(kingdom_data)
+                    
+        if "villagers" in changes:
+            for villager_id, villager_data in changes["villagers"].items():
+                if villager_id in self.game_data.villagers:
+                    self.game_data.villagers[villager_id].update_from_data(villager_data)
+```
+
+## 5. TEKNİK GEREKSINIMLER VE OPTIMIZASYON
+
+### 5.1. Performans Optimizasyonu
+```python
+class QuadTree:
+    def __init__(self, boundary, capacity):
+        self.boundary = boundary  # Sınırlar (x, y, width, height)
+        self.capacity = capacity  # Maksimum nesne sayısı
+        self.objects = []  # Nesneler
+        self.divided = False  # Bölünmüş mü?
+        self.northwest = None  # Kuzeybatı alt ağaç
+        self.northeast = None  # Kuzeydoğu alt ağaç
+        self.southwest = None  # Güneybatı alt ağaç
+        self.southeast = None  # Güneydoğu alt ağaç
+        
+    def insert(self, obj):
+        # Nesneyi ağaca ekle
+        if not self.boundary.contains(obj.position):
+            return False
+            
+        if len(self.objects) < self.capacity and not self.divided:
+            self.objects.append(obj)
+            return True
+            
+        if not self.divided:
+            self.subdivide()
+            
+        return (self.northwest.insert(obj) or
+                self.northeast.insert(obj) or
+                self.southwest.insert(obj) or
+                self.southeast.insert(obj))
+                
+    def subdivide(self):
+        # Ağacı alt ağaçlara böl
+        x = self.boundary.x
+        y = self.boundary.y
+        w = self.boundary.width / 2
+        h = self.boundary.height / 2
+        
+        self.northwest = QuadTree(Rectangle(x, y, w, h), self.capacity)
+        self.northeast = QuadTree(Rectangle(x + w, y, w, h), self.capacity)
+        self.southwest = QuadTree(Rectangle(x, y + h, w, h), self.capacity)
+        self.southeast = QuadTree(Rectangle(x + w, y + h, w, h), self.capacity)
+        
+        self.divided = True
+        
+    def query(self, range_rect, found=None):
+        # Belirtilen alandaki nesneleri bul
+        if found is None:
+            found = []
+            
+        if not self.boundary.intersects(range_rect):
+            return found
+            
+        for obj in self.objects:
+            if range_rect.contains(obj.position):
+                found.append(obj)
+                
+        if self.divided:
+            self.northwest.query(range_rect, found)
+            self.northeast.query(range_rect, found)
+            self.southwest.query(range_rect, found)
+            self.southeast.query(range_rect, found)
+            
+        return found
+```
+
+### 5.2. Bellek Yönetimi
+```python
+class ObjectPool:
+    def __init__(self, factory_func, reset_func, initial_size=10):
+        self.factory_func = factory_func  # Yeni nesne oluşturma fonksiyonu
+        self.reset_func = reset_func  # Nesne sıfırlama fonksiyonu
+        self.pool = []  # Nesne havuzu
+        
+        # Havuzu başlangıç boyutuna göre doldur
+        for _ in range(initial_size):
+            self.pool.append(factory_func())
+            
+    def get(self):
+        # Havuzdan nesne al
+        if not self.pool:
+            # Havuz boşsa yeni nesne oluştur
+            return self.factory_func()
+        else:
+            # Havuzdan bir nesne al
+            return self.pool.pop()
+            
+    def release(self, obj):
+        # Nesneyi havuza geri ver
+        self.reset_func(obj)
+        self.pool.append(obj)
+```
+
+
+## 6. UYGULAMA PLANI VE ÖNCELİK SIRASI
+
+1. Temel altyapı (dünya, köylüler, binalar)
+2. Kullanıcı arayüzü sistemi
+3. Köylü yapay zekası ve karar mekanizması
+4. Ekonomi ve kaynak sistemi
+5. Sosyal ilişkiler
+6. Krallık yönetimi
+7. Savaş ve çatışma mekanikleri
+8. Büyü ve teknoloji
+9. Çok oyunculu hazırlıklar
+10. Optimizasyon ve cilalama
+
+İlk aşamada (1-4), oyunun temel mekanikleri ve tek oyunculu deneyim oluşturulacak. İkinci aşamada (5-8), oyunun derinliği ve karmaşıklığı artırılacak. Son aşamada (9-10), çok oyunculu özellikler eklenecek ve performans iyileştirilecek. 

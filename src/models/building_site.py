@@ -9,7 +9,7 @@ class BuildingSite(QObject):
     construction_finished = pyqtSignal(object)  # İnşaat tamamlandığında sinyal gönder
     construction_progress_updated = pyqtSignal(object, float)  # İnşaat ilerlemesi güncellendiğinde sinyal gönder
     
-    def __init__(self, x: float, y: float, width: int = 80, height: int = 100):
+    def __init__(self, x: float, y: float, width: int = 60, height: int = 75):
         super().__init__()
         self.x = x
         self.y = y
@@ -41,8 +41,8 @@ class BuildingSite(QObject):
     
     def adjust_size_by_type(self):
         """Ev tipine göre boyutları ayarla"""
-        base_width = 80
-        base_height = 100
+        base_width = 60  # 80'den 60'a düşürüldü
+        base_height = 75  # 100'den 75'e düşürüldü
         
         if self.house_type == "ev1":
             # Küçük ev
@@ -78,17 +78,17 @@ class BuildingSite(QObject):
                 castle = game_controller.castle
                 wood_amount = castle.get_inventory().get('odun', 0)
                 
-                # En az 20 odun gerekiyor
-                if wood_amount < 20:
-                    print(f"İnşaat başlatılamadı: Kale envanterinde yeterli odun yok! Mevcut: {wood_amount}/20")
+                # En az 30 odun gerekiyor
+                if wood_amount < 30:
+                    print(f"İnşaat başlatılamadı: Kale envanterinde yeterli odun yok! Mevcut: {wood_amount}/30")
                     return False
                 
                 # Odunu envanterden çıkar
-                if not castle.remove_from_inventory("odun", 20):
+                if not castle.remove_from_inventory("odun", 30):
                     print(f"İnşaat başlatılamadı: Kale envanterinden odun çıkarılamadı!")
                     return False
                 
-                print(f"İnşaat için 20 odun kullanıldı! Kalan odun: {castle.get_inventory().get('odun', 0)}")
+                print(f"İnşaat için 30 odun kullanıldı! Kalan odun: {castle.get_inventory().get('odun', 0)}")
                 
                 # Kontrol panelini güncelle
                 if hasattr(game_controller, 'control_panel') and game_controller.control_panel:
@@ -143,6 +143,20 @@ class BuildingSite(QObject):
         self.builder.money += 100
         self.builder.buildings_built += 1
         print(f"İnşaat tamamlandı! İnşaatçı {self.builder.name} 100 altın kazandı. Toplam altın: {self.builder.money}")
+        
+        # Rastgele bir köylüye evi tahsis et
+        if hasattr(self.builder, 'game_controller') and self.builder.game_controller:
+            game_controller = self.builder.game_controller
+            potential_owners = [v for v in game_controller.villagers 
+                               if not hasattr(v, 'has_house') or not v.has_house]
+            
+            if potential_owners:
+                # Evi satın alacak rastgele bir köylü seç
+                future_owner = random.choice(potential_owners)
+                print(f"Yeni inşa edilen ev, rastgele {future_owner.name} kişisine tahsis edildi.")
+                
+                # Ev sahipliği bayrağı oluşturulacak ev içinde ayarlanacak
+                self.future_owner = future_owner
         
         # İnşaat tamamlandı sinyali gönder
         self.construction_finished.emit(self)

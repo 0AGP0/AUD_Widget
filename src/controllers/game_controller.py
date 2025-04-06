@@ -35,19 +35,44 @@ class GameController(QObject):
         
         print("GameController başlatılıyor...")
         
-        # Oyun öğeleri
-        self.trees = []          # Ağaçlar
-        self.villagers = []      # Köylüler
-        self.wolves = []         # Kurtlar
-        self.birds = []          # Kuş ve kargalar
-        self.structures = []     # Yapılar
-        self.building_sites = [] # İnşaat alanları
-        self.houses = []         # Evler
-        self.market = None       # Pazar alanı
+        # Ekran boyutları
+        self.width = 1920  # Varsayılan genişlik
+        self.height = 1080  # Varsayılan yükseklik
+        self.ground_y = self.height - 100  # Zemin seviyesi
         
-        # Gece/Gündüz sistemi için değişkenler
-        self.is_daytime = True  # True = Gündüz, False = Gece
-        self.remaining_time = self.DAY_DURATION * 1000  # Milisaniye cinsinden
+        # Oyun durumu
+        self.is_running = False
+        self.is_daytime = True
+        self.day_time = 0
+        self.remaining_time = self.DAY_DURATION
+        self.day_night_timer = QTimer()
+        self.day_night_timer.timeout.connect(self.update_remaining_time)
+        
+        # Oyun nesneleri
+        self.villagers = []
+        self.trees = []
+        self.houses = []
+        self.building_sites = []
+        self.castle = None
+        self.cave = None
+        self.market = None
+        self.wolves = []
+        self.birds = []
+        self.structures = []  # Yapılar listesi eklendi
+        
+        # Kurt oluşturma parametreleri
+        self.last_wolf_spawn = 0
+        self.wolf_spawn_interval = 5  # 5 saniye
+        
+        # Oyun döngüsü zamanlayıcısı
+        self.game_timer = QTimer()
+        self.game_timer.timeout.connect(self.update_game_loop)
+        
+        # Kontrol paneli referansı
+        self.control_panel = None
+        
+        # Oyun kontrolcüsü için değişkenler
+        self.ground_height = 25  # Zemin yüksekliği
         self.day_count = 1      # Gün sayısı
         
         # Zamanı izleyen timer
@@ -67,9 +92,8 @@ class GameController(QObject):
         self.last_bird_spawn = time.time()  # Son kuş oluşturma zamanı
         
         # Oyun kontrolcüsü için değişkenler
-        self.castle = None
-        self.ground_y = 600  # Varsayılan zemin Y koordinatı
-        self.ground_height = 25  # Zemin yüksekliği
+        self.ground_y = self.ground_y
+        self.ground_height = self.ground_height
         
         # Diyalog yöneticisini başlat
         self.dialogue_manager = DialogueManager()
@@ -101,6 +125,9 @@ class GameController(QObject):
         self.bird_spawn_interval = 15.0  # Saniye
         self.bird_spawn_chance = 0.3     # %30 şans
         self.max_birds = 5              # Maksimum aynı anda kuş sayısı
+        
+        # Oyunu başlat
+        self.setup_game()
     
     def setup_game(self):
         """Oyunu başlat ve gerekli nesneleri oluştur"""
@@ -190,8 +217,8 @@ class GameController(QObject):
             self.trees = []
             
             # Tüm ağaçlar için sabit boyutlar
-            tree_width = 70  # 80'den 50'ye düşürüldü
-            tree_height = 80  # 120'den 80'e düşürüldü
+            tree_width = 50 # 80'den 50'ye düşürüldü
+            tree_height = 60  # 120'den 80'e düşürüldü
             
             # Kale pozisyonu (varsayılan olarak x=0)
             castle_x = 0
@@ -287,12 +314,6 @@ class GameController(QObject):
             # Meslekleri güncelle
             professions = PROFESSIONS.copy()
             
-            # Zorunlu meslekleri takip etmek için
-            has_lumberjack = False  # Oduncu
-            has_builder = False     # İnşaatçı
-            has_guard = False       # Gardiyan
-            has_priest = False      # Papaz
-            
             # Erkek ve kadın isimleri
             male_names = MALE_NAMES.copy()  # Orijinal listeyi değiştirmemek için copy kullanıyoruz
             female_names = FEMALE_NAMES.copy()
@@ -300,8 +321,10 @@ class GameController(QObject):
             print(f"Erkek isimleri: {male_names}")
             print(f"Kadın isimleri: {female_names}")
             
-            # 6 köylü oluştur (4 yerine 6)
-            for i in range(6):
+            # 5 köylü oluştur ve belirli meslekleri ata
+            required_professions = ["Gardiyan", "Papaz", "Oduncu", "Avcı", "İnşaatçı"]
+            
+            for i in range(5):
                 print(f"Köylü {i+1} oluşturuluyor...")
                 # Cinsiyet seçimi (en az 1 erkek ve 1 kadın olmalı)
                 if i == 0:
@@ -367,84 +390,10 @@ class GameController(QObject):
                 villager.desired_traits = desired_traits
                 print(f"Eşinde aradığı: {villager.desired_traits}")
                 
-                # Meslek atama stratejisi
-                # Son köylüye geldiğimizde eksik zorunlu meslekleri kontrol et
-                if i == 5:  # Son köylü
-                    if not has_lumberjack:
-                        profession = "Oduncu"
-                        has_lumberjack = True
-                    elif not has_builder:
-                        profession = "İnşaatçı"
-                        has_builder = True
-                    elif not has_guard:
-                        profession = "Gardiyan"
-                        has_guard = True
-                    elif not has_priest:
-                        profession = "Papaz"
-                        has_priest = True
-                    else:
-                        # Tüm zorunlu meslekler atanmışsa, kalan mesleklerden birini seç
-                        available_professions = [p for p in professions if p not in ["Oduncu", "İnşaatçı", "Gardiyan", "Papaz"] or 
-                                                (p == "Papaz" and not has_priest)]
-                        profession = random.choice(available_professions)
-                elif i == 4:  # 5. köylü
-                    # Eksik zorunlu meslekleri kontrol et
-                    missing_required = []
-                    if not has_lumberjack:
-                        missing_required.append("Oduncu")
-                    if not has_builder:
-                        missing_required.append("İnşaatçı")
-                    if not has_guard:
-                        missing_required.append("Gardiyan")
-                    if not has_priest:
-                        missing_required.append("Papaz")
-                    
-                    if missing_required:
-                        profession = random.choice(missing_required)
-                        if profession == "Oduncu":
-                            has_lumberjack = True
-                        elif profession == "İnşaatçı":
-                            has_builder = True
-                        elif profession == "Gardiyan":
-                            has_guard = True
-                        elif profession == "Papaz":
-                            has_priest = True
-                    else:
-                        # Tüm zorunlu meslekler atanmışsa, kalan mesleklerden birini seç
-                        available_professions = [p for p in professions if p not in ["Papaz"] or 
-                                                (p == "Papaz" and not has_priest)]
-                        profession = random.choice(available_professions)
-                        if profession == "Papaz":
-                            has_priest = True
-                else:
-                    # İlk 4 köylü için rastgele meslek ata, ancak Papaz'ı sadece bir kişiye ata
-                    if not has_priest and random.random() < 0.2:  # %20 şans
-                        profession = "Papaz"
-                        has_priest = True
-                    elif not has_lumberjack and random.random() < 0.3:  # %30 şans
-                        profession = "Oduncu"
-                        has_lumberjack = True
-                    elif not has_builder and random.random() < 0.3:  # %30 şans
-                        profession = "İnşaatçı"
-                        has_builder = True
-                    elif not has_guard and random.random() < 0.3:  # %30 şans
-                        profession = "Gardiyan"
-                        has_guard = True
-                    else:
-                        # Papaz hariç diğer mesleklerden birini seç
-                        available_professions = [p for p in professions if p != "Papaz" or 
-                                                (p == "Papaz" and not has_priest)]
-                        profession = random.choice(available_professions)
-                        if profession == "Oduncu":
-                            has_lumberjack = True
-                        elif profession == "İnşaatçı":
-                            has_builder = True
-                        elif profession == "Gardiyan":
-                            has_guard = True
-                        elif profession == "Papaz":
-                            has_priest = True
-                
+                # Sırayla belirli meslekleri ata
+                profession = required_professions[i]
                 print(f"Meslek: {profession}")
+                
                 villager.set_profession(profession)
                 villager.set_game_controller(self)
                 self.villagers.append(villager)
@@ -458,10 +407,7 @@ class GameController(QObject):
             self.villagers_updated.emit(self.villagers)
             
             print(f"Toplam köylü sayısı: {len(self.villagers)}")
-            print(f"Oduncu: {'Var' if has_lumberjack else 'Yok'}")
-            print(f"İnşaatçı: {'Var' if has_builder else 'Yok'}")
-            print(f"Gardiyan: {'Var' if has_guard else 'Yok'}")
-            print(f"Papaz: {'Var' if has_priest else 'Yok'}")
+            print("Meslekler: Gardiyan, Papaz, Oduncu, Avcı, İnşaatçı")
             
         except Exception as e:
             print(f"HATA: Köylü oluşturma genel hatası: {e}")
@@ -535,49 +481,69 @@ class GameController(QObject):
             return None
     
     def update_game(self):
-        """Oyun döngüsünü güncelle"""
+        """Oyun güncellemesi - her kare çalışır"""
         try:
+            # Güncel zaman
             current_time = time.time()
-            time_since_last_update = current_time - self.last_periodic_update
             
-            # Her 30 saniyede bir rastgele yeni ağaç ekle (eskisi kaldırılmışsa)
-            if current_time - self.last_resource_update > 30.0:
-                self.add_new_tree()
-                self.last_resource_update = current_time
+            # Köylü sayısını kontrol et ve 5'ten fazlaysa fazla olanları kaldır
+            if len(self.villagers) > 5:
+                print(f"Köylü sayısı 5'i aşıyor! Mevcut: {len(self.villagers)}")
+                # 5 köylü kalacak şekilde fazla olanları kaldır, ilk 5 köylüyü tut
+                self.villagers = self.villagers[:5]
+                print(f"Köylü sayısı 5'e düşürüldü. Yeni sayı: {len(self.villagers)}")
+                # Köylü listesini güncelle
+                if hasattr(self, 'villagers_updated'):
+                    self.villagers_updated.emit(self.villagers)
             
-            # Her çağrıda köylü ve kurt hareketlerini güncelle (periyodik değil)
-            # Köylüleri güncelle
+            # Tüm köylü davranışlarını güncelle
             for villager in self.villagers:
-                if hasattr(villager, 'move'):
-                    villager.move()
-                if hasattr(villager, 'update_animation'):
-                    villager.update_animation()
+                # Köylünün davranış ağacını güncelle
+                if hasattr(villager, 'update_behavior_tree'):
+                    villager.update_behavior_tree()
+                else:
+                    villager.move()  # Davranış ağacı yoksa temel hareket
+                    
+                    # Animasyon kontrolü - animasyon hızını yavaşlat
+                    if not hasattr(villager, 'last_animation_update'):
+                        villager.last_animation_update = current_time
+                    
+                    # Sadece hareket ediyorsa animasyonu güncelle, yavaş tempoda
+                    if villager.is_moving and current_time - villager.last_animation_update > 0.25:  # Her 250ms'de bir kare değişimi
+                        if hasattr(villager, 'update_animation'):
+                            villager.update_animation()
+                        villager.last_animation_update = current_time
             
             # Kurtları güncelle
-            for wolf in self.wolves:
-                wolf.update()
-                
-            # Kuşları güncelle - her frame'de
+            self.update_wolves()
+            
+            # Kuşları güncelle
             self.update_birds()
             
-            # Periyodik güncellemeler (her saniye)
-            if time_since_last_update >= 0.5:  # 1.0 yerine 0.5 saniye
-                # Köylülerin davranış ağaçlarını güncelle
-                for villager in self.villagers:
-                    if hasattr(villager, 'update_behavior_tree'):
-                        villager.update_behavior_tree()
-                
-                # Pazar tezgahlarını kontrol et
-                if self.market:
-                    for stall in self.market.stalls:
-                        # Zaman aşımına uğrayan tezgahları serbest bırak
-                        if stall.is_active and stall.owner and stall.owner.last_trade_time + 30.0 < current_time:
-                            stall.owner.release_market_stall()
-                
+            # Pazar tezgahlarını güncelle
+            self.update_market_stalls()
+            
+            # İnşaat alanlarını güncelle
+            for site in self.building_sites[:]:  # Kopyasını kullan (döngü esnasında liste değişebilir)
+                if hasattr(site, 'update'):
+                    if not site.update():
+                        # İnşaat tamamlandı veya silindi, listeden çıkar
+                        if site in self.building_sites:
+                            self.building_sites.remove(site)
+            
+            # Periyodik olarak rastgele diyalog oluştur (her 60 saniyede bir)
+            current_time = time.time()
+            if current_time - self.last_periodic_update > 60:  # Her 60 saniyede bir
                 self.last_periodic_update = current_time
+                # Rastgele diyalog üret
+                self.generate_random_dialogue()
+                # Köylüleri birbirleriyle ilişkilendir
+                self.update_villager_relationships()
+                # Yeni bir kuş/karga oluştur
+                self.try_spawn_bird()
                 
         except Exception as e:
-            print(f"HATA: Oyun güncelleme hatası: {e}")
+            print(f"HATA: Oyun güncellemesi sırasında hata: {e}")
             import traceback
             traceback.print_exc()
     
@@ -647,31 +613,88 @@ class GameController(QObject):
             
             # Süre doldu mu kontrol et
             if self.remaining_time <= 0:
-                # Gece/gündüz durumunu değiştir
-                self.is_daytime = not self.is_daytime
-                
-                # Yeni süreyi ayarla
-                if self.is_daytime:
-                    self.remaining_time = self.DAY_DURATION * 1000
-                    self.day_count += 1  # Gündüz başladığında gün sayısını artır
-                    print(f"Gün {self.day_count} başladı")
-                else:
-                    self.remaining_time = self.NIGHT_DURATION * 1000
-                    print(f"Gün {self.day_count} sona erdi, gece başladı")
-                
-                # Gündüz veya gece değişimi olduğunda özel işlemler
-                self.handle_day_night_change()
+                self.toggle_day_night()
             
-            # Dakika ve saniye formatında kalan süreyi al
-            minutes, seconds = self.get_time_as_minutes_seconds()
-            
-            # Debug için kalan süreyi yazdır
-            # print(f"Gündüz/Gece Kalan Süre: {minutes:02d}:{seconds:02d}")
+            # Kontrol panelini güncelle
+            if hasattr(self, 'control_panel'):
+                self.control_panel.update_time_label()
                 
         except Exception as e:
             print(f"HATA: Süre güncelleme hatası: {e}")
             import traceback
             traceback.print_exc()
+    
+    def toggle_day_night(self):
+        """Gündüz/gece durumunu değiştir"""
+        # Gece/gündüz durumunu değiştir
+        self.is_daytime = not self.is_daytime
+        
+        # Yeni süreyi ayarla
+        if self.is_daytime:
+            self.remaining_time = self.DAY_DURATION * 1000
+            self.day_count += 1  # Gündüz başladığında gün sayısını artır
+            print(f"Gün {self.day_count} başladı")
+        else:
+            self.remaining_time = self.NIGHT_DURATION * 1000
+            print(f"Gün {self.day_count} sona erdi, gece başladı")
+        
+        # Gündüz veya gece değişimi olduğunda özel işlemler
+        self.handle_day_night_change()
+    
+    def update_market_stalls(self):
+        """Pazar tezgahlarını güncelle"""
+        try:
+            if not self.market or not hasattr(self.market, 'stalls'):
+                return
+            
+            # Her tezgahın durumunu kontrol et
+            for stall in self.market.stalls:
+                # Tezgah sahibi var mı?
+                if not stall.owner or not stall.is_active:
+                    continue
+                
+                # Tezgahta stok var mı?
+                inventory_count = stall.inventory.get(stall.stall_type, 0)
+                if inventory_count <= 0:
+                    # Stok yoksa tezgahı boşalt
+                    stall.release_stall()
+                    print(f"Tezgah #{stall.stall_id} stok bittiği için boşaltıldı")
+                    continue
+                
+                # Tezgah sahibi köylüyü kontrol et
+                owner = stall.owner
+                if not hasattr(owner, 'has_market_stall') or not owner.has_market_stall:
+                    # Köylü tezgahı bırakmış
+                    stall.release_stall()
+                    print(f"Tezgah #{stall.stall_id} sahibi ayrıldığı için boşaltıldı")
+                    continue
+                
+                # Fiyat güncelleme, pazarlık gibi ek mantıklar burada olabilir
+                
+                # Otomatik satış/müşteri sistemi için buraya ek kodlar eklenebilir
+                
+        except Exception as e:
+            print(f"HATA: Pazar tezgahları güncellenirken hata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def find_available_stall(self, stall_type):
+        """Belirtilen türde boş bir tezgah bul"""
+        if not self.market or not hasattr(self.market, 'stalls'):
+            return None
+        
+        # Boş tezgah ara
+        for stall in self.market.stalls:
+            if stall.stall_type == stall_type and not stall.owner:
+                return stall
+        return None
+    
+    def get_remaining_time(self):
+        """Gündüz/gece döngüsünde kalan süreyi dakika:saniye olarak döndür"""
+        remaining_seconds = self.remaining_time // 1000
+        minutes = remaining_seconds // 60
+        seconds = remaining_seconds % 60
+        return minutes, seconds
     
     def handle_day_night_change(self):
         """Gündüz veya gece değişimi olduğunda yapılacak işlemler"""
@@ -823,11 +846,48 @@ class GameController(QObject):
         if hasattr(self, 'dialogue_manager'):
             self.dialogue_manager.set_game_controller(self)
 
-    def create_building_site(self, x: float, y: float) -> BuildingSite:
+    def create_building_site(self, x: float, y: float, min_distance=80) -> BuildingSite:
         """İnşaat alanı oluştur"""
         try:
             # Zemin seviyesini kullan
             ground_y = self.ground_y
+            
+            # Diğer yapılarla çakışma kontrolü
+            MIN_BUILDING_DISTANCE = min_distance  # Yapılar arası minimum mesafe (parametreden alınıyor)
+            
+            # Diğer inşaat alanlarıyla çakışıyor mu kontrol et
+            for building_site in self.building_sites:
+                distance = abs(building_site.x - x)
+                if distance < MIN_BUILDING_DISTANCE:
+                    print(f"İnşaat alanı oluşturulamadı: Başka bir inşaat alanına çok yakın! Mesafe: {distance} < {MIN_BUILDING_DISTANCE}")
+                    return None
+            
+            # Evlerle çakışıyor mu kontrol et
+            for house in self.houses:
+                distance = abs(house.x - x)
+                if distance < MIN_BUILDING_DISTANCE:
+                    print(f"İnşaat alanı oluşturulamadı: Bir eve çok yakın! Mesafe: {distance} < {MIN_BUILDING_DISTANCE}")
+                    return None
+            
+            # Diğer özel yapılarla çakışıyor mu kontrol et (kale, kilise, pazar vs.)
+            if hasattr(self, 'castle') and self.castle:
+                distance = abs(self.castle.x - x)
+                if distance < MIN_BUILDING_DISTANCE:
+                    print(f"İnşaat alanı oluşturulamadı: Kaleye çok yakın! Mesafe: {distance} < {MIN_BUILDING_DISTANCE}")
+                    return None
+            
+            # Kilise konumu yaklaşık olarak 310
+            distance_to_church = abs(310 - x)
+            if distance_to_church < MIN_BUILDING_DISTANCE:
+                print(f"İnşaat alanı oluşturulamadı: Kiliseye çok yakın! Mesafe: {distance_to_church} < {MIN_BUILDING_DISTANCE}")
+                return None
+            
+            # Pazar yeri kontrolü
+            if hasattr(self, 'market') and self.market:
+                distance = abs(self.market.x - x)
+                if distance < MIN_BUILDING_DISTANCE:
+                    print(f"İnşaat alanı oluşturulamadı: Pazar yerine çok yakın! Mesafe: {distance} < {MIN_BUILDING_DISTANCE}")
+                    return None
             
             # İnşaat alanını oluştur (zemin seviyesinde)
             building_site = BuildingSite(x=x, y=ground_y)
@@ -864,6 +924,29 @@ class GameController(QObject):
                 house_type=building_site.house_type
             )
             
+            # İnşaatçı bilgisini taşı
+            if building_site.builder:
+                house.builder = building_site.builder
+                # İnşaatçının yaptığı ev sayısını artır
+                building_site.builder.buildings_built += 1
+                print(f"{building_site.builder.name} bir ev inşa etti. Toplam: {building_site.builder.buildings_built}")
+            
+            # Rastgele seçilen köylüye evi ver
+            if hasattr(building_site, 'future_owner') and building_site.future_owner:
+                future_owner = building_site.future_owner
+                # Ev sahibini ayarla
+                house.set_owner(future_owner.name)
+                
+                # Köylüye ev sahibi olduğunu bildir
+                future_owner.has_house = True
+                future_owner.house_id = house.id
+                
+                print(f"Ev ID: {house.id} sahibi: {future_owner.name}")
+            else:
+                # Evi satılık olarak işaretle (sahibi yok, ama inşaatçı kayıtlı)
+                house.for_sale = True
+                print(f"Ev ID: {house.id} satışa çıkarıldı. Tip: {house.house_type}")
+            
             # Listeye ekle
             self.houses.append(house)
             
@@ -873,9 +956,6 @@ class GameController(QObject):
                     self.building_sites.pop(i)
                     print(f"İnşaat alanı ID: {building_site.id} listeden kaldırıldı")
                     break
-            
-            # Ev satın alma işlemini başlat
-            self.try_sell_house(house)
             
             # Kontrol panelini güncelle
             if hasattr(self, 'control_panel'):
@@ -896,8 +976,8 @@ class GameController(QObject):
                 print(f"Ev ID: {house.id} zaten satılmış! Sahibi: {house.owner}")
                 return
                 
-            # Satın alabilecek köylüleri bul (5 altın veya daha fazlası olanlar)
-            potential_buyers = [v for v in self.villagers if v.money >= 5 and not v.has_house]
+            # Satın alabilecek köylüleri bul (100 altın veya daha fazlası olanlar)
+            potential_buyers = [v for v in self.villagers if v.money >= 100 and not v.has_house]
             
             if not potential_buyers:
                 print(f"Ev ID: {house.id} için alıcı bulunamadı!")
@@ -907,13 +987,18 @@ class GameController(QObject):
             buyer = random.choice(potential_buyers)
             
             # Evi sat
-            house_price = 5  # Ev fiyatını düşürdük (10'dan 5'e)
+            house_price = 100  # Ev fiyatı: 100 altın
             buyer.money -= house_price
             house.set_owner(buyer.name)
             
             # Köylünün ev sahibi olduğunu işaretle
             buyer.has_house = True
             buyer.house_id = house.id
+            
+            # İnşaatçıya ödemeyi yap
+            if hasattr(house, 'builder') and house.builder:
+                house.builder.money += house_price
+                print(f"İnşaatçı {house.builder.name} ev satışından {house_price} altın kazandı! Toplam: {house.builder.money} altın")
             
             print(f"Ev ID: {house.id} satıldı! Alıcı: {buyer.name}, Ödenen: {house_price} altın, Kalan para: {buyer.money} altın")
             
@@ -941,7 +1026,7 @@ class GameController(QObject):
         try:
             for villager in self.villagers:
                 # Köylünün hedefini rastgele bir noktaya ayarla
-                villager.target_x = random.randint(100, 800)  # Kale etrafında rastgele bir nokta
+                villager.target_x = random.randint(100, self.width - 100)
                 villager.target_y = self.ground_y - 100
                 villager.is_moving = True
                 villager.is_wandering = True  # Dolaşmayı başlat
@@ -963,42 +1048,57 @@ class GameController(QObject):
     def go_home(self):
         """Eve veya kaleye dön"""
         try:
-            # Ev sahibiyse evine dön
-            if self.has_house and hasattr(self, 'game_controller') and self.game_controller:
-                house = self.game_controller.find_house_by_id(self.house_id)
-                if house:
-                    target_x = house.get_entrance()[0]
-                    # Eğer eve yakınsa durma
-                    if abs(self.x - target_x) < 20:
-                        self.is_moving = False
-                        self.state = "Evde"
-                        return
-                    # Eve doğru hareket et
-                    self.move_towards(target_x)
-                    self.state = "Eve Dönüyor"
-                    return
+            print("Köylüler evlerine veya kaleye dönüyor...")
             
-            # Ev sahibi değilse veya ev bulunamadıysa kaleye dön
-            if hasattr(self, 'game_controller') and self.game_controller and hasattr(self.game_controller, 'castle'):
-                castle = self.game_controller.castle
-                if castle:
-                    target_x = castle.get_entrance()[0]
-                    # Eğer kaleye yakınsa durma
-                    if abs(self.x - target_x) < 20:
-                        self.is_moving = False
-                        self.state = "Kalede"
-                        return
-                    # Kaleye doğru hareket et
-                    self.move_towards(target_x)
-                    self.state = "Kaleye Dönüyor"
-                    return
-            
-            # Kale de bulunamadıysa dolaş
-            self.wander()
-            self.state = "Dolaşıyor"
+            for villager in self.villagers:
+                # Köylünün hedef noktasına doğru hareket etmesini sağla
+                if hasattr(villager, 'has_house') and villager.has_house:
+                    # Ev sahibi olanlar evlerine gitsin
+                    house = self.find_house_by_id(villager.house_id)
+                    if house:
+                        # Evin giriş noktası
+                        entrance = house.get_entrance()
+                        target_x, target_y = entrance
+                        
+                        # Hedefe ayarla
+                        villager.target_x = target_x
+                        villager.target_y = target_y
+                        villager.is_moving = True
+                        villager.is_wandering = False  # Dolaşmayı durdur
+                        villager.state = "Eve Dönüyor"
+                        
+                        print(f"{villager.name} evine dönüyor. Hedef: ({target_x}, {target_y})")
+                    else:
+                        # Ev bulunamadıysa kaleye git
+                        self._direct_villager_to_castle(villager)
+                else:
+                    # Ev sahibi olmayanlar kaleye gitsin
+                    self._direct_villager_to_castle(villager)
             
         except Exception as e:
-            print(f"HATA: {self.name} eve dönme hatası: {e}")
+            print(f"HATA: Köylüler eve gönderilirken hata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _direct_villager_to_castle(self, villager):
+        """Köylüyü kaleye yönlendir"""
+        try:
+            # Kale varsa
+            if hasattr(self, 'castle') and self.castle:
+                # Kalenin giriş noktası
+                entrance = self.castle.get_entrance()
+                target_x, target_y = entrance
+                
+                # Hedefe ayarla
+                villager.target_x = target_x
+                villager.target_y = target_y
+                villager.is_moving = True
+                villager.is_wandering = False  # Dolaşmayı durdur
+                villager.state = "Kaleye Dönüyor"
+                
+                print(f"{villager.name} kaleye dönüyor. Hedef: ({target_x}, {target_y})")
+        except Exception as e:
+            print(f"HATA: Köylü kaleye yönlendirilirken hata: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1093,7 +1193,7 @@ class GameController(QObject):
                 wolf = Wolf(
                     wolf_id=i+1,  # wolf_id parametresi gerekli
                     x=wolf_x,
-                    y=0,  # Y koordinatı önemsiz, yer seviyesine otomatik konumlandırılacak
+                    y=self.ground_y,  # Y koordinatı zemin seviyesine ayarlandı
                     width=50,
                     height=35
                 )
@@ -1106,12 +1206,9 @@ class GameController(QObject):
                 # Game controller'ı ayarla
                 wolf.set_game_controller(self)
                 
-                # Dolaşmaya başlat
-                wolf.wander()
-                
                 # Kurt nesnesini listeye ekle
                 self.wolves.append(wolf)
-                print(f"Kurt {i+1} oluşturuldu: x={wolf_x}, cave_x={cave_x}, min_x={wolf.min_x}")
+                print(f"Kurt {i+1} oluşturuldu: x={wolf_x}, y={self.ground_y}, cave_x={cave_x}, min_x={wolf.min_x}")
                 
             print(f"Toplam {num_wolves} kurt oluşturuldu")
                 
@@ -1157,125 +1254,201 @@ class GameController(QObject):
             traceback.print_exc()
             return None
     
-    def update_birds(self):
-        """Kuşları güncelle ve gerekirse yenilerini oluştur"""
+    def update_wolves(self):
+        """Kurtları güncelle"""
         try:
+            if not hasattr(self, 'wolves') or not self.wolves:
+                return
+            
+            # Güncel zaman
             current_time = time.time()
-            dt = 0.016  # Yaklaşık 60 FPS için 1/60 saniye
             
-            # Ağaç yüksekliği ve zemin seviyesi bilgilerini hesapla
-            tree_height = 80  # Varsayılan ağaç yüksekliği
-            tree_top_y = self.ground_y - tree_height  # Ağacın tepesinin y koordinatı
-            
-            # Kuşların uçabileceği yükseklikleri belirle
-            min_flight_y = tree_top_y  # En düşük uçuş seviyesi (ağaç tepesi)
-            max_flight_y = tree_top_y - 100  # En yüksek uçuş seviyesi (ağaç tepesinden 100px yukarı)
-            
-            # Kuşları güncelle ve kaldırılacak olanları işaretle
-            birds_to_remove = []
-            for bird in self.birds:
-                # Yükseklik sınırlarını kontrol et
-                if bird.y < max_flight_y:
-                    bird.y = float(max_flight_y)
-                elif bird.y > min_flight_y:
-                    bird.y = float(min_flight_y)
+            # Kurtları güncelle
+            for wolf in self.wolves:
+                # Kurt update metodunu çağır
+                if hasattr(wolf, 'update'):
+                    wolf.update()
+                else:
+                    # Eski sisteme uyumluluk için
+                    # Hareket kontrol değişkenlerini tanımla (eğer yoksa)
+                    if not hasattr(wolf, 'last_animation_update'):
+                        wolf.last_animation_update = current_time
+                    if not hasattr(wolf, 'animation_frame'):
+                        wolf.animation_frame = 1
+                    
+                    # Kurt hareketi
+                    if not hasattr(wolf, 'target_x') or not hasattr(wolf, 'target_y'):
+                        # İlk hedef noktasını belirle
+                        wolf.target_x = random.randint(100, self.width - 100)
+                        wolf.target_y = self.ground_y
+                    
+                    # Hedef noktaya doğru hareket et
+                    dx = wolf.target_x - wolf.x
+                    dy = wolf.target_y - wolf.y
+                    
+                    # Hareket hızı
+                    speed = 1.5  # 2'den 1.5'e düşürüldü
+                    is_moving = False
+                    
+                    # Yönü belirle
+                    if dx > 0:
+                        wolf.direction = 1  # Sağa doğru
+                        is_moving = True
+                    elif dx < 0:
+                        wolf.direction = -1  # Sola doğru
+                        is_moving = True
+                    
+                    # Hareket et
+                    if abs(dx) > speed:
+                        wolf.x += speed * wolf.direction
+                        is_moving = True
+                    else:
+                        wolf.x = wolf.target_x
+                    
+                    if abs(dy) > speed:
+                        wolf.y += speed
+                        is_moving = True
+                    else:
+                        wolf.y = wolf.target_y
+                    
+                    # Sadece hareket ediyorsa animasyonu güncelle, yavaş tempoda
+                    if is_moving and current_time - wolf.last_animation_update > 0.25:  # Her 250ms'de bir kare değişimi
+                        wolf.animation_frame = (wolf.animation_frame % 4) + 1
+                        wolf.last_animation_update = current_time
+                    
+                    # Hedefe ulaşıldıysa yeni hedef belirle
+                    if abs(dx) < speed and abs(dy) < speed:
+                        # Yeni hedef belirle
+                        if hasattr(wolf, 'wander'):
+                            wolf.wander()
+                        else:
+                            # Eski sistemle uyumlu
+                            wolf.target_x = random.randint(100, self.width - 100)
+                            wolf.target_y = self.ground_y
                 
-                # Kuşu güncelle
-                bird.update(dt)
-                if bird.should_remove:
-                    birds_to_remove.append(bird)
-            
-            # Kaldırılacak kuşları listeden çıkar
-            for bird in birds_to_remove:
-                print(f"{bird.bird_type.capitalize()} #{bird.bird_id} oyundan kaldırıldı")
-                self.birds.remove(bird)
-            
-            # Debug: Kuş sayısını göster
-            print(f"Mevcut kuş sayısı: {len(self.birds)}")
-            
-            # Belirli aralıklarla yeni kuşlar oluştur
-            if len(self.birds) < self.max_birds and current_time - self.last_bird_spawn > self.bird_spawn_interval:
-                self.last_bird_spawn = current_time
+        except Exception as e:
+            print(f"HATA: Kurtları güncellerken hata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def spawn_wolf(self):
+        """Yeni kurt oluştur"""
+        try:
+            # Mağara yakınında rastgele bir konum belirle
+            if self.cave:
+                # Mağaranın etrafında rastgele bir konum
+                cave_x = self.cave.x
+                cave_y = self.cave.y
                 
-                # Belirli bir şansla kuş oluştur
-                if random.random() < self.bird_spawn_chance:
-                    new_bird = self.spawn_bird()
-                    if new_bird:
-                        print(f"Yeni kuş oluşturuldu: {new_bird.bird_type} #{new_bird.bird_id}")
+                # Mağaranın 100-300 piksel uzağında rastgele bir konum
+                offset_x = random.randint(-300, 300)
+                offset_y = random.randint(-100, 100)
+                
+                x = cave_x + offset_x
+                y = cave_y + offset_y
+            else:
+                # Mağara yoksa ekranın sağ tarafında rastgele bir konum
+                x = random.randint(self.width - 400, self.width - 100)
+                y = self.ground_y
+            
+            # Kurt nesnesini oluştur
+            from src.models.wolf import Wolf
+            wolf = Wolf(x=x, y=y)
+            
+            # Kurt özelliklerini ayarla
+            wolf.width = 40
+            wolf.height = 30
+            wolf.direction = 1  # Varsayılan olarak sağa doğru
+            wolf.animation_frame = 1
+            
+            # Kurtu listeye ekle
+            self.wolves.append(wolf)
+            
+            print(f"Yeni kurt oluşturuldu: ID={wolf.wolf_id}, Konum=({x}, {y})")
+            return wolf
             
         except Exception as e:
-            print(f"HATA: Kuş güncelleme hatası: {e}")
+            print(f"HATA: Kurt oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def update_birds(self):
+        """Kuşları güncelle"""
+        try:
+            # Kuşlar listesini kontrol et
+            if not hasattr(self, 'birds'):
+                self.birds = []
+                return
+            
+            # Mevcut kuşları güncelle
+            for bird in self.birds[:]:  # Kopyasını kullan
+                if hasattr(bird, 'update'):
+                    if not bird.update():  # False dönerse kuş ekrandan çıkmıştır
+                        if bird in self.birds:
+                            self.birds.remove(bird)
+                            print(f"Kuş #{bird.bird_id} ekrandan çıktı, silindi")
+            
+        except Exception as e:
+            print(f"HATA: Kuşları güncellerken hata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def try_spawn_bird(self):
+        """Yeni bir kuş oluşturmayı dene"""
+        try:
+            # Kuş oluşturma için uygun mu kontrol et
+            if len(self.birds) >= self.max_birds:
+                return  # Maksimum kuş sayısına ulaşıldı
+            
+            current_time = time.time()
+            if current_time - self.last_bird_spawn < self.bird_spawn_interval:
+                return  # Oluşturma aralığı henüz dolmadı
+            
+            # Kuş oluşturma şansını kontrol et
+            if random.random() < self.bird_spawn_chance:
+                self.spawn_bird()
+            
+            self.last_bird_spawn = current_time
+                
+        except Exception as e:
+            print(f"HATA: Kuş oluşturma denemesi sırasında hata: {e}")
             import traceback
             traceback.print_exc()
     
     def spawn_bird(self):
-        """Rastgele bir ağaçta kuş veya karga oluştur"""
+        """Yeni bir kuş oluştur"""
         try:
-            if not self.trees:
-                print("UYARI: Kuş oluşturmak için ağaç yok")
-                return
+            from src.models.bird import Bird
             
-            # Rastgele bir ağaç seç
-            visible_trees = [tree for tree in self.trees if tree.is_visible]
-            if not visible_trees:
-                print("UYARI: Görünür ağaç yok, kuş oluşturulamıyor")
-                return
-                
-            source_tree = random.choice(visible_trees)
+            # Rastgele kuş tipi seç
+            bird_type = random.choice(["kuş", "karga"])
             
-            # Kuş ID'si
-            bird_id = len(self.birds) + 1
+            # Rastgele bir yönden gelsin (sol/sağ)
+            direction = random.choice([-1, 1])  # -1: soldan sağa, 1: sağdan sola
             
-            # Kuş tipi (kus veya karga)
-            bird_type = random.choice(["kus", "karga"])
+            # Kuşun başlangıç X konumu (ekranın dışından)
+            # Ekran genişliğini hesapla
+            screen_width = 0
+            if hasattr(self, 'window') and hasattr(self.window, 'width'):
+                screen_width = self.window.width()
+            else:
+                # Varsayılan değer
+                screen_width = 1920
             
-            # Ağaç özelliklerini al
-            tree_x = source_tree.x
-            tree_y = source_tree.y
-            tree_height = source_tree.height
+            # Yöne göre başlangıç X konumu
+            start_x = screen_width + 50 if direction == -1 else -50
             
-            # Kuşun başlangıç pozisyonu - tam ağacın tepesinde
-            x = tree_x  # Ağacın X koordinatı
+            # Rastgele bir Y yüksekliği (gökyüzünde)
+            start_y = random.randint(50, 300)
             
-            # Ağacın tepesine yerleştir
-            y = self.ground_y - tree_height  # Ağacın tam tepesinde
-            
-            print(f"Kuş oluşturuluyor: Ağaç konumu: ({tree_x}, {tree_y}), yükseklik: {tree_height}, kuş başlangıç Y: {y}")
-            
-            # Kuş veya karga boyutları - daha küçük boyutlar için %60 oranında küçült
-            if bird_type == "kus":
-                width = 40 * 0.6
-                height = 30 * 0.6
-            else:  # karga
-                width = 50 * 0.6
-                height = 40 * 0.6
-            
-            # Kuş veya karga oluştur
-            bird = Bird(
-                bird_id=bird_id,
-                x=x,
-                y=y,
-                width=width,
-                height=height,
-                bird_type=bird_type
-            )
-            
-            # Game controller'ı ayarla
-            bird.game_controller = self
-            
-            # Hedef yüksekliği sınırla - en fazla ağaç tepesinden 100px yukarı
-            min_flight_y = y  # En düşük seviye (ağaç tepesi)
-            max_flight_y = y - 100  # En yüksek seviye (ağaç tepesinden 100px yukarı)
-            
-            # Hedef yüksekliği sınırlar içinde ayarla
-            bird.target_altitude = random.uniform(max_flight_y, min_flight_y)
-            
-            # Kuşlar listesine ekle
+            # Kuş oluştur
+            bird = Bird(x=start_x, y=start_y, direction=direction, bird_type=bird_type)
             self.birds.append(bird)
-            print(f"Yeni {bird_type} #{bird_id} oluşturuldu: x={x}, y={y}, hedef_yükseklik={bird.target_altitude}")
             
+            print(f"Yeni {bird_type} oluşturuldu: ID={bird.bird_id}, Konum=({start_x}, {start_y}), Yön={direction}")
             return bird
-            
+        
         except Exception as e:
             print(f"HATA: Kuş oluşturma hatası: {e}")
             import traceback
@@ -1287,14 +1460,18 @@ class GameController(QObject):
         try:
             # Kalenin konumuna göre pazar yerini belirle
             castle_x = self.castle.x if hasattr(self, 'castle') and self.castle else 500
-            market_x = castle_x + 400  # Kaleden 400 piksel sağda
+            market_x = castle_x + 240  # Kaleden 240 piksel sağda (kiliseye yakın)
             
             # Pazar yapısı için y değeri - ground_y kullan, kilise benzeri konumlandırma
             market_y = self.ground_y  # Zemin seviyesi
             
             # Market nesnesini oluştur
             from src.models.market import Market
-            self.market = Market(market_x, market_y, 4)  # 4 tezgahlı pazar
+            self.market = Market(market_x, market_y, 4)  # 4 tezgahlı pazar (2'den 4'e çıkarıldı)
+            
+            # Market'a GameController referansı ver
+            if hasattr(self.market, 'set_game_controller'):
+                self.market.set_game_controller(self)
             
             # Pazar sinyallerini bağla
             self.market.transaction_completed.connect(self.on_trade_completed)
@@ -1309,7 +1486,7 @@ class GameController(QObject):
             import traceback
             traceback.print_exc()
             return None
-    
+
     def on_trade_completed(self, seller, buyer, product, amount, price):
         """Ticaret tamamlandığında çağrılır"""
         # İlgili köylülere durumu bildir
@@ -1327,17 +1504,222 @@ class GameController(QObject):
     def update_game_loop(self):
         """Oyun döngüsünü güncelle"""
         try:
+            # Oyunda aktif bir şey yoksa çık
+            if not self.is_running:
+                return
+                
+            # Hızlı referanslar oluştur
+            villagers = self.villagers
+            trees = self.trees
+            
+            # Oyun zamanını güncelle
             current_time = time.time()
             
-            # Köylü hareketlerini güncelle
+            # Kurt yönetimi (gece aktif)
+            if not self.is_daytime:
+                # Kurtları güncelle
+                self.update_wolves()
+                
+                # Her 5 saniyede bir yeni kurt oluşturma şansı
+                if current_time - self.last_wolf_spawn > self.wolf_spawn_interval:
+                    self.last_wolf_spawn = current_time
+                    if random.random() < 0.2:  # %20 şans
+                        self.spawn_wolf()
+            
+            # Kuşları güncelle
+            self.update_birds()
+            
+            # Kuş oluşturmayı dene (gündüz aktif)
+            if self.is_daytime:
+                self.try_spawn_bird()
+            
+            # İnşaatçı kontrolü - envanteri kontrol et ve gerekirse inşaat başlat
+            if self.is_daytime:  # Sadece gündüz inşaat yapılsın
+                # İnşaatçıları bul
+                builders = [v for v in self.villagers if v.profession == "İnşaatçı"]
+                # İnşaatçılar varsa ve inşaat yapmıyorlarsa kontrol et
+                if builders and not any(b.is_building for b in builders):
+                    # Günlük limiti dolmamış inşaatçı var mı?
+                    if any(b.buildings_built < b.max_buildings_per_day for b in builders):
+                        # Odun kontrolü ve inşaat başlatma
+                        self.check_for_auto_building()
+            
+            # Pazar tezgahlarını güncelle
+            self.update_market_stalls()
+            
+            # Zamanı güncelle
+            self.update_time()
+            
+            # Raptiye ve Kopar sistemi için periyodik görevler
+            if current_time - self.last_periodic_update > 5.0:  # 5 saniyede bir
+                self.last_periodic_update = current_time
+                
+                # Yeni yapılmış evleri satmayı dene
+                for house in self.houses:
+                    if not house.is_owned() and house.for_sale:
+                        self.try_sell_house(house)
+            
+        except Exception as e:
+            print(f"HATA: Oyun döngüsü hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def check_for_auto_building(self):
+        """Kale envanterinde yeterli odun varsa inşaat başlat"""
+        try:
+            # Kale yoksa çık
+            if not self.castle:
+                return
+                
+            # Envanteri kontrol et
+            wood_amount = self.castle.get_inventory().get('odun', 0)
+            
+            # 30 odun varsa ve aktif bir inşaatçı varsa inşaat başlat
+            if wood_amount >= 30:
+                # İnşaatçıları bul
+                builders = [v for v in self.villagers if v.profession == "İnşaatçı"]
+                
+                if not builders:
+                    return  # İnşaatçı yok
+                
+                # Günlük limiti dolmamış bir inşaatçı bul
+                available_builders = [b for b in builders if b.buildings_built < b.max_buildings_per_day]
+                
+                if not available_builders:
+                    return  # Müsait inşaatçı yok
+                
+                # Rastgele bir inşaatçı seç
+                builder = random.choice(available_builders)
+                
+                # Potansiyel ev konumlarını belirle
+                potential_locations = self.find_potential_building_locations()
+                
+                # Uygun konum yoksa minimum mesafeyi azaltarak tekrar dene
+                if not potential_locations:
+                    print("Normal mesafe ile uygun inşaat alanı bulunamadı, daha sıkışık deneniyor...")
+                    potential_locations = self.find_potential_building_locations(min_distance=60)
+                
+                # Hala bulunamadıysa daha da azalt
+                if not potential_locations:
+                    print("Mesafe 60 ile uygun inşaat alanı bulunamadı, daha da sıkışık deneniyor...")
+                    potential_locations = self.find_potential_building_locations(min_distance=40)
+                
+                if not potential_locations:
+                    print("Uygun inşaat alanı bulunamadı! Minimum mesafe 40 ile bile bulunamadı.")
+                    return False
+                
+                # Rastgele bir konum seç
+                building_x = random.choice(potential_locations)
+                
+                # İnşaat alanı oluştur
+                building_site = self.create_building_site(building_x, self.ground_y, min_distance=min(80, 40 if len(potential_locations) <= 3 else 60 if len(potential_locations) <= 5 else 80))
+                
+                if building_site:
+                    # İnşaatı başlat
+                    if building_site.start_construction(builder):
+                        # İnşaatçının durum bilgilerini güncelle
+                        builder.is_building = True
+                        builder.target_building_site = building_site
+                        builder.state = "İnşaat Yapıyor"
+                        print(f"{builder.name} yeni bir ev inşaatına başladı! Konum: {building_x}")
+                        return True
+                
+            return False
+                
+        except Exception as e:
+            print(f"HATA: Otomatik inşaat kontrolü: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def find_potential_building_locations(self, min_distance=80):
+        """Ev inşaatı için potansiyel konumlar bulur"""
+        try:
+            MIN_BUILDING_DISTANCE = min_distance  # Yapılar arası minimum mesafe
+            potential_locations = []
+            
+            # Ekran genişliğini ve kullanılabilir alanı hesapla
+            # Ekranın sol sınırı 100, sağ sınırı 1820 piksel olarak kabul edelim
+            left_boundary = 100  # Ekranın solunda da yer olsun
+            right_boundary = 1820
+            
+            # 100 piksel aralıklarla potansiyel konumları kontrol et
+            step_size = 100
+            
+            for x in range(int(left_boundary), int(right_boundary - MIN_BUILDING_DISTANCE), step_size):
+                # Bu konumun uygun olup olmadığını kontrol et
+                is_suitable = True
+                
+                # Kaleye çok yakın mı kontrol et
+                if hasattr(self, 'castle') and self.castle:
+                    castle_x = self.castle.x
+                    castle_width = self.castle.width
+                    if abs(x - (castle_x + castle_width / 2)) < MIN_BUILDING_DISTANCE:
+                        is_suitable = False
+                        continue
+                
+                # Diğer inşaat alanlarını kontrol et
+                for site in self.building_sites:
+                    if abs(site.x - x) < MIN_BUILDING_DISTANCE:
+                        is_suitable = False
+                        break
+                
+                # Evleri kontrol et
+                if is_suitable:
+                    for house in self.houses:
+                        if abs(house.x - x) < MIN_BUILDING_DISTANCE:
+                            is_suitable = False
+                            break
+                
+                # Kiliseyi kontrol et (310 civarında)
+                if is_suitable and abs(310 - x) < MIN_BUILDING_DISTANCE:
+                    is_suitable = False
+                
+                # Pazarı kontrol et
+                if is_suitable and hasattr(self, 'market') and self.market:
+                    if abs(self.market.x - x) < MIN_BUILDING_DISTANCE:
+                        is_suitable = False
+                
+                # Eğer uygunsa listeye ekle
+                if is_suitable:
+                    potential_locations.append(x)
+            
+            # Konumları biraz rastgele yap
+            if potential_locations:
+                # Her bir konuma +-10 piksel rastgele değişim ekle
+                potential_locations = [x + random.randint(-10, 10) for x in potential_locations]
+                # Uzun bir liste ise, en fazla 10 konum seç
+                if len(potential_locations) > 10:
+                    potential_locations = random.sample(potential_locations, 10)
+            
+            print(f"Potansiyel inşaat konumları bulundu (min. mesafe: {min_distance}): {len(potential_locations)} adet")
+            if potential_locations:
+                print(f"Örnek konumlar: {potential_locations[:3]}")
+            return potential_locations
+        
+        except Exception as e:
+            print(f"HATA: Potansiyel inşaat konumları bulunurken hata: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
+    def update_time(self):
+        """Zamanı güncelle"""
+        try:
+            # Güncel zaman
+            current_time = time.time()
+            
+            # Tüm köylü davranışlarını güncelle
             for villager in self.villagers:
-                villager.move()
-                villager.update_animation()  # Köylü animasyonları güncelleniyor
+                if hasattr(villager, 'update_behavior_tree'):
+                    villager.update_behavior_tree()
+                else:
+                    villager.move()
             
             # Kurt hareketlerini güncelle
             for wolf in self.wolves:
-                wolf.move()
-                wolf.update_animation()  # Kurt animasyonlarını burada güncellediğimizden emin olalım
+                if hasattr(wolf, 'update'):
+                    wolf.update()
             
             # İnşaat alanlarını güncelle
             self.update_building_sites()

@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QFrame, QScrollArea, QListWidget, QListWidgetItem,
                              QProgressBar, QMessageBox, QTabWidget, QTextEdit, QTableWidget,
-                             QTableWidgetItem, QHeaderView)
+                             QTableWidgetItem, QHeaderView, QGroupBox)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QPoint
 from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap
 from PyQt5.QtWidgets import QApplication
@@ -549,14 +549,11 @@ class ControlPanel(QWidget):
             """)
             title_layout.addWidget(title_label)
             
-            # Butonlar için spacer
-            title_layout.addStretch()
-            
-            # Küçült butonu
-            minimize_button = QPushButton("─")
-            minimize_button.setFixedSize(30, 30)
-            minimize_button.clicked.connect(self.minimize_game.emit)
-            minimize_button.setStyleSheet("""
+            # Üst düğmeler
+            self.minimize_button = QPushButton("_")
+            self.minimize_button.setFixedSize(30, 30)
+            self.minimize_button.clicked.connect(self.minimize_game.emit)
+            self.minimize_button.setStyleSheet("""
                 QPushButton {
                     background-color: transparent;
                     color: #9E9E9E;
@@ -567,13 +564,13 @@ class ControlPanel(QWidget):
                     background-color: #2D2D2D;
                 }
             """)
-            title_layout.addWidget(minimize_button)
+            title_layout.addWidget(self.minimize_button)
             
             # Kapat butonu
-            close_button = QPushButton("×")
-            close_button.setFixedSize(30, 30)
-            close_button.clicked.connect(self.close_game.emit)
-            close_button.setStyleSheet("""
+            self.close_button = QPushButton("×")
+            self.close_button.setFixedSize(30, 30)
+            self.close_button.clicked.connect(self.close_game.emit)
+            self.close_button.setStyleSheet("""
                 QPushButton {
                     background-color: transparent;
                     color: #9E9E9E;
@@ -585,7 +582,7 @@ class ControlPanel(QWidget):
                     color: #E4E4E4;
                 }
             """)
-            title_layout.addWidget(close_button)
+            title_layout.addWidget(self.close_button)
             
             left_layout.addWidget(title_bar)
             
@@ -856,8 +853,42 @@ class ControlPanel(QWidget):
             else:
                 print("UYARI: Kale envanteri boş!")
                 
+            # Pazar envanterini de güncelle
+            self.update_market_inventory()
+            
         except Exception as e:
             print(f"HATA: Kale envanteri güncellenirken hata: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def update_market_inventory(self):
+        """Pazar envanterini güncelle"""
+        try:
+            # GameController kontrol et
+            if not hasattr(self, 'game_controller') or not self.game_controller:
+                print("UYARI: GameController bulunamadı!")
+                return
+            
+            # Pazar kontrol et
+            if not hasattr(self.game_controller, 'market') or not self.game_controller.market:
+                print("UYARI: Pazar bulunamadı! Envanter güncellenemedi.")
+                return
+            
+            # Pazar envanterini güncelle
+            market = self.game_controller.market
+            
+            # Odun stoğu
+            if hasattr(self, 'wood_stock_label') and hasattr(market, 'wood_stock'):
+                self.wood_stock_label.setText(str(market.wood_stock))
+            
+            # Yiyecek stoğu
+            if hasattr(self, 'food_stock_label') and hasattr(market, 'food_stock'):
+                self.food_stock_label.setText(str(market.food_stock))
+            
+            print(f"Pazar envanteri güncellendi: Odun: {market.wood_stock}, Yiyecek: {market.food_stock}")
+            
+        except Exception as e:
+            print(f"HATA: Pazar envanteri güncellenirken hata: {e}")
             import traceback
             traceback.print_exc()
     

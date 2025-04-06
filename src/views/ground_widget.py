@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
-from PyQt5.QtGui import QPainter, QPixmap, QColor, QTransform, QFont, QPen, QBrush, QPainterPath
-from ..models.villager import Villager, TestVillager
+from PyQt5.QtWidgets import QWidget, QApplication, QDesktopWidget
+from PyQt5.QtCore import Qt, QTimer, QRect, QPoint, QPointF
+from PyQt5.QtGui import QPainter, QPixmap, QColor, QTransform, QFont, QPen, QBrush, QPainterPath, QLinearGradient
+from ..models.villager import Villager
 import random
 import os
 import math
@@ -21,10 +21,13 @@ class GroundWidget(QWidget):
         self.game_controller = game_controller
         
         # Zemin yüksekliği - sabit değer
-        self.ground_height = 10
+        self.ground_height = 3
         
         # Çizim yapıldı mı?
         self.is_drawing = False
+        
+        # Resimlerin yüklenip yüklenmediğini takip et
+        self.images_loaded = False
         
         # Resimleri saklamak için sözlük
         self.images = {
@@ -37,13 +40,19 @@ class GroundWidget(QWidget):
             "cave": None,  # Mağara resmi
             "pazar1": None,  # Pazar1 resmi
             "pazar2": None,   # Pazar2 resmi
+            "pazar3": None,   # Pazar3 resmi
+            "pazar4": None,   # Pazar4 resmi
             "kilise": None,  # Kilise resmi
             "gardiyan": None,  # Gardiyan resmi
             "degirmen": None,  # Değirmen resmi
             "kuyu": None,  # Kuyu resmi
             "kurt": None,  # Kurt resmi
             "kus": None,  # Kuş resmi
-            "karga": None  # Karga resmi
+            "karga": None,  # Karga resmi
+            "han": None,  # Han resmi
+            "duvar": None,  # Duvar resmi
+            "fener": None,   # Fener resmi
+            "ahir": None   # Ahır resmi
         }
         
         # Resimleri yükle
@@ -64,13 +73,19 @@ class GroundWidget(QWidget):
                 "cave": None,  # Mağara resmi
                 "pazar1": None,  # Pazar1 resmi
                 "pazar2": None,   # Pazar2 resmi
+                "pazar3": None,   # Pazar3 resmi
+                "pazar4": None,   # Pazar4 resmi
                 "kilise": None,  # Kilise resmi
                 "gardiyan": None,  # Gardiyan resmi
                 "degirmen": None,  # Değirmen resmi
                 "kuyu": None,  # Kuyu resmi
                 "kurt": None,  # Kurt resmi
                 "kus": None,  # Kuş resmi
-                "karga": None  # Karga resmi
+                "karga": None,  # Karga resmi
+                "han": None,  # Han resmi
+                "duvar": None,  # Duvar resmi
+                "fener": None,   # Fener resmi
+                "ahir": None   # Ahır resmi
             }
             
             # Ağaç resimlerini yükle
@@ -134,20 +149,15 @@ class GroundWidget(QWidget):
             else:
                 print(f"UYARI: Mağara resmi bulunamadı: {cave_path}")
             
-            # Pazar resimlerini yükle
-            pazar1_path = os.path.join("src", "assets", "Pazar1.png")
-            if os.path.exists(pazar1_path):
-                self.images["pazar1"] = QPixmap(pazar1_path)
-                print(f"Pazar1 resmi yüklendi: {pazar1_path}")
-            else:
-                print(f"UYARI: Pazar1 resmi bulunamadı: {pazar1_path}")
-            
-            pazar2_path = os.path.join("src", "assets", "Pazar2.png")
-            if os.path.exists(pazar2_path):
-                self.images["pazar2"] = QPixmap(pazar2_path)
-                print(f"Pazar2 resmi yüklendi: {pazar2_path}")
-            else:
-                print(f"UYARI: Pazar2 resmi bulunamadı: {pazar2_path}")
+            # Pazar resimlerini yükle (tüm pazar assetleri için)
+            pazar_types = ["Pazar1", "Pazar2", "pazar3", "pazar4"]
+            for i, pazar_type in enumerate(pazar_types, 1):
+                pazar_path = os.path.join("src", "assets", f"{pazar_type}.png")
+                if os.path.exists(pazar_path):
+                    self.images[f"pazar{i}"] = QPixmap(pazar_path)
+                    print(f"{pazar_type} resmi yüklendi: {pazar_path}")
+                else:
+                    print(f"UYARI: {pazar_type} resmi bulunamadı: {pazar_path}")
             
             # Kilise resmini yükle
             kilise_path = os.path.join("src", "assets", "kilise.png")
@@ -180,6 +190,14 @@ class GroundWidget(QWidget):
                 print(f"Kuyu resmi yüklendi: {kuyu_path}")
             else:
                 print(f"UYARI: Kuyu resmi bulunamadı: {kuyu_path}")
+                
+            # Han resmini yükle
+            han_path = os.path.join("src", "assets", "Han.png")
+            if os.path.exists(han_path):
+                self.images["han"] = QPixmap(han_path)
+                print(f"Han resmi yüklendi: {han_path}")
+            else:
+                print(f"UYARI: Han resmi bulunamadı: {han_path}")
             
             # Kurt resmini yükle
             kurt_path = os.path.join("src", "assets", "kurt.png")
@@ -204,7 +222,33 @@ class GroundWidget(QWidget):
             else:
                 print(f"UYARI: Karga resmi bulunamadı: {karga_path}")
             
+            # Duvar resmini yükle
+            duvar_path = os.path.join("src", "assets", "duvar.png")
+            if os.path.exists(duvar_path):
+                self.images["duvar"] = QPixmap(duvar_path)
+                print(f"Duvar resmi yüklendi: {duvar_path}")
+            else:
+                print(f"UYARI: Duvar resmi bulunamadı: {duvar_path}")
+            
+            # Fener resmini yükle
+            fener_path = os.path.join("src", "assets", "fener.png")
+            if os.path.exists(fener_path):
+                self.images["fener"] = QPixmap(fener_path)
+                print(f"Fener resmi yüklendi: {fener_path}")
+            else:
+                print(f"UYARI: Fener resmi bulunamadı: {fener_path}")
+            
+            # Ahır resmini yükle
+            ahir_path = os.path.join("src", "assets", "ahır.png")
+            if os.path.exists(ahir_path):
+                self.images["ahir"] = QPixmap(ahir_path)
+                print(f"Ahır resmi yüklendi: {ahir_path}")
+            else:
+                print(f"UYARI: Ahır resmi bulunamadı: {ahir_path}")
+            
             print("Resimler yüklendi")
+            # Resimlerin yüklendiğini işaretle
+            self.images_loaded = True
             
         except Exception as e:
             print(f"HATA: Resim yükleme hatası: {e}")
@@ -270,56 +314,96 @@ class GroundWidget(QWidget):
         self.is_drawing = True
         
         try:
+            if not self.images_loaded:
+                self.load_images()
+                
             painter = QPainter(self)
-            painter.setRenderHint(QPainter.Antialiasing)  # Kenar yumuşatma
+            painter.setRenderHint(QPainter.Antialiasing)
             
-            # Zemini çiz
+            # Arkaplanı çizme - transparan olması için
+            # Önceki mavi gökyüzü çizimi kaldırıldı
+            
+            # Duvarı çiz - en altta olsun (zeminin altında)
+            self.draw_wall(painter)
+            
+            # Zemin çiz
             self.draw_ground(painter)
             
-            # Kaleyi çiz
-            self.draw_castle(painter)
+            # Kuşları çiz
+            if self.game_controller and hasattr(self.game_controller, 'birds'):
+                self.draw_birds(painter)
+            
+            # Ağaçları çiz - yapılardan ÖNCE çizerek yapıların önde olmasını sağlıyoruz
+            if self.game_controller and hasattr(self.game_controller, 'trees'):
+                self.draw_trees(painter)
             
             # Mağarayı çiz
-            self.draw_cave(painter)
-            
-            # Kiliseyi çiz
-            self.draw_church(painter)
-            
-            # Pazar yerini çiz - Kaleden sonra, köylüler ve yapılardan önce
-            self.draw_markets(painter)
-            
-            # Gardiyanı çiz - artık aktif
-            self.draw_guard(painter)
-            
-            # Diğer yapıları ekleyin
-            # self.draw_mill(painter)
-            # self.draw_well(painter)
-            
-            # Evleri çiz
-            self.draw_houses(painter)
-            
-            # İnşaat alanlarını çiz
-            self.draw_building_sites(painter)
-            
-            # Ağaçları çiz
-            self.draw_trees(painter)
+            if self.game_controller and hasattr(self.game_controller, 'cave'):
+                self.draw_cave(painter)
             
             # Kurtları çiz
-            self.draw_wolves(painter)
+            if self.game_controller and hasattr(self.game_controller, 'wolves'):
+                self.draw_wolves(painter)
             
-            # Kuşları çiz
-            self.draw_birds(painter)
+            # ---- Yapıları çiz (hepsi ağaçlardan sonra) ----
             
-            # Köylüleri çiz - en üstte olmalı
-            self.draw_villagers(painter)
+            # Kaleyi çiz
+            if self.game_controller and hasattr(self.game_controller, 'castle'):
+                self.draw_castle(painter)
+            
+            # Kiliseyi çiz
+            if self.images["kilise"]:
+                self.draw_church(painter)
+            
+            # Ahırı çiz
+            if self.images["ahir"]:
+                self.draw_stable(painter)
+            
+            # Pazarı çiz
+            if self.game_controller and hasattr(self.game_controller, 'market'):
+                self.draw_markets(painter)
+                
+            # Hanı çiz
+            if self.images["han"]:
+                self.draw_inn(painter)
+            
+            # Gardiyanı çiz
+            if self.images["gardiyan"]:
+                self.draw_guard(painter)
+            
+            # Değirmeni çiz
+            if self.images["degirmen"]:
+                self.draw_mill(painter)
+                
+            # Kuyuyu çiz
+            if self.images["kuyu"]:
+                self.draw_well(painter)
+            
+            # Fenerleri çiz
+            if self.images["fener"]:
+                self.draw_lanterns(painter)
+            
+            # İnşaat alanlarını çiz
+            if self.game_controller and hasattr(self.game_controller, 'building_sites'):
+                self.draw_building_sites(painter)
+            
+            # Evleri çiz
+            if self.game_controller and hasattr(self.game_controller, 'houses'):
+                self.draw_houses(painter)
+            
+            # ---- En son köylüleri çiz (her şeyin üzerinde) ----
+            
+            # Köylüleri çiz
+            if self.game_controller and hasattr(self.game_controller, 'villagers'):
+                self.draw_villagers(painter)
             
             painter.end()
             
         except Exception as e:
-            print(f"HATA: paintEvent: {e}")
+            print(f"HATA: Çizim hatası: {e}")
             import traceback
             traceback.print_exc()
-            
+        
         self.is_drawing = False
     
     def draw_ground(self, painter):
@@ -346,7 +430,7 @@ class GroundWidget(QWidget):
             scaled_ground = self.images["ground"].scaled(new_width, new_height, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
             
             # Zeminin y pozisyonunu hesapla (ekranın en altı)
-            ground_y = self.height() - new_height + 15
+            ground_y = self.height() - new_height + 19
             
             # Ekran genişliğini al
             screen_width = self.width()
@@ -377,16 +461,16 @@ class GroundWidget(QWidget):
                 return
             
             # Kale boyutlarını küçült
-            castle_width = 150
-            castle_height = 150
+            castle_width = 190
+            castle_height = 190
             scaled_castle = self.images["castle"].scaled(castle_width, castle_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
             # Kale pozisyonu - sol tarafta, zemin üzerinde
-            x = 10
+            x = 1
             # Zemin seviyesini hesapla
             ground_y = self.height() - self.ground_height
             # Kaleyi zemin üzerine yerleştir
-            y = ground_y - scaled_castle.height() + 20  # Biraz gömülü olsun
+            y = ground_y - scaled_castle.height()   # Biraz gömülü olsun
             
             # Kaleyi çiz
             painter.drawPixmap(x, y, scaled_castle)
@@ -404,17 +488,17 @@ class GroundWidget(QWidget):
                 return
             
             # Kilise boyutlarını ayarla
-            church_width = 130
-            church_height = 130
+            church_width = 90
+            church_height = 90
             
             # Kilise resmini ölçeklendir
             scaled_church = self.images["kilise"].scaled(church_width, church_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
             # Kalenin konumundan 300 piksel sağda
-            church_x = 300 + 10  # Kale 10 pikselde başlıyor
+            church_x = 520  # Kale 10 pikselde başlıyor
             
             # Y pozisyonunu hesapla (zemin üzerinde)
-            church_y = self.height() - self.ground_height - church_height + 15
+            church_y = self.height() - self.ground_height - church_height + 10
             
             # Kiliseyi çiz
             painter.drawPixmap(church_x, church_y, scaled_church)
@@ -431,7 +515,7 @@ class GroundWidget(QWidget):
         try:
             if not hasattr(self, 'game_controller') or not self.game_controller:
                 return
-                
+            
             for tree in self.game_controller.trees:
                 if not tree.is_visible:
                     continue
@@ -450,6 +534,31 @@ class GroundWidget(QWidget):
                 
                 # Ağacı çiz
                 painter.drawPixmap(tree_x, tree_y, tree.width, tree.height, tree_img)
+                
+                # Eğer ağaç kesiliyor ise ilerleme çubuğu göster
+                if hasattr(tree, 'is_being_cut') and tree.is_being_cut and hasattr(tree, 'cut_progress'):
+                    progress = tree.cut_progress
+                    
+                    # İlerleme çubuğu boyutları
+                    bar_width = int(tree.width * 0.8)
+                    bar_height = 10
+                    bar_x = tree_x + int(tree.width * 0.1)  # Ağacın merkezine hizala
+                    bar_y = tree_y - 15  # Ağacın üstünde
+                    
+                    # Arkaplan
+                    painter.fillRect(bar_x, bar_y, bar_width, bar_height, QColor(0, 0, 0, 128))
+                    
+                    # İlerleme
+                    progress_width = int(bar_width * progress / 100)
+                    painter.fillRect(bar_x, bar_y, progress_width, bar_height, QColor(255, 0, 0, 200))
+                    
+                    # İlerleme yüzdesi
+                    painter.setPen(Qt.white)
+                    painter.setFont(QFont("Arial", 8))
+                    painter.drawText(
+                        bar_x, bar_y, bar_width, bar_height,
+                        Qt.AlignCenter, f"%{progress}"
+                    )
                 
         except Exception as e:
             print(f"HATA: Ağaç çizme hatası: {e}")
@@ -647,7 +756,7 @@ class GroundWidget(QWidget):
             for house in self.game_controller.houses:
                 # Ev konumunu hesapla
                 x = int(house.x - house.width / 2)
-                y = int(house.y - house.height)
+                y = int(house.y - house.height - 8)
                 
                 # Ev tipine göre resmi seç
                 house_type = house.house_type
@@ -888,133 +997,69 @@ class GroundWidget(QWidget):
             traceback.print_exc()
     
     def draw_markets(self, painter):
-        """Pazar alanlarını çiz"""
+        """Pazar alanlarını çiz - Dört farklı pazar tezgahı ile kuyu ortada olacak şekilde"""
         try:
-            if not self.game_controller or not self.game_controller.market:
-                print("Pazar çizilemedi: Market nesnesi bulunamadı")
-                return
+            # Han'ın konumunu referans olarak al
+            # Han'ın draw_inn metodundaki varsayılan konumu
+            han_x = 200  
+            han_width = 90  # Han genişliği
             
-            market = self.game_controller.market
+            # Pazar tezgahları için boyutlar
+            market_width = 30
+            market_height = 30
             
-            # Pazar1 resmini kullan (genellikle pazar yapısı)
-            if self.images["pazar1"]:
-                # Pazar yapısı boyutlarını ayarla
-                market_width = 120
-                market_height = 120
-                
-                # Pazar resmini ölçeklendir
-                scaled_market = self.images["pazar1"].scaled(market_width, market_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                
-                # Pazar Y koordinatını, kilise ile benzer mantıkla hesapla
-                market_draw_y = self.height() - self.ground_height - market_height + 15
-                
-                # Pazar yapısının kendisini çiz
-                painter.drawPixmap(
-                    int(market.x), 
-                    int(market_draw_y),
-                    scaled_market
-                )
-                
-                print(f"Pazar yapısı çizildi: Konum=({int(market.x)}, {int(market_draw_y)}), Boyut={market_width}x{market_height}")
+            # Han'ın sağından başlayarak pazar tezgahlarının pozisyonlarını hesapla
+            # Han'ın 50 piksel sağına pazar1
+            market1_x = han_x + han_width + 45
             
-            # Pazar tezgahlarını çiz
-            if self.images["pazar2"]:
-                for i, stall in enumerate(market.stalls):
-                    # Tezgah boyutlarını ayarla
-                    stall_width = 50
-                    stall_height = 50
-                    
-                    # Tezgah resmini ölçeklendir
-                    scaled_stall = self.images["pazar2"].scaled(stall_width, stall_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    
-                    # Tezgah Y koordinatını, kilise ile benzer mantıkla hesapla
-                    stall_draw_y = self.height() - self.ground_height - stall_height + 5
-                    
-                    # Tezgahları ana yapının sağına doğru yerleştir
-                    stall_x = int(market.x + market_width + 20 + (i * (stall_width + 10)))
-                    
-                    # Tezgahları çiz
-                    painter.drawPixmap(
-                        stall_x, 
-                        stall_draw_y,
-                        scaled_stall
-                    )
-                    
-                    # Tezgah konumunu güncelle (game_controller erişimi için)
-                    stall.x = stall_x + stall_width/2
-                    stall.y = stall_draw_y + stall_height
-                    
-                    # Tezgahta ürün ve fiyat bilgisini göster
-                    if stall.is_active:
-                        # Tezgah başlığını yaz
-                        painter.setPen(Qt.black)
-                        painter.setFont(QFont("Arial", 8, QFont.Bold))
-                        product_name = {
-                            "odun": "Odun Tezgahı",
-                            "erzak": "Erzak Tezgahı",
-                            "ev": "Ev Satışı"
-                        }.get(stall.stall_type, stall.stall_type.capitalize())
-                        
-                        painter.drawText(
-                            stall_x, 
-                            stall_draw_y - 25,
-                            stall_width,
-                            20,
-                            Qt.AlignCenter,
-                            product_name
-                        )
-                        
-                        # Eğer aktif bir satıcı varsa
-                        if stall.owner:
-                            inventory_count = stall.inventory.get(stall.stall_type, 0)
-                            price_text = f"Fiyat: {stall.price} altın"
-                            inventory_text = f"Stok: {inventory_count}"
-                            
-                            # Arka plan ekle
-                            bg_rect = QRect(
-                                stall_x, 
-                                stall_draw_y - 5,
-                                stall_width,
-                                40
-                            )
-                            painter.fillRect(bg_rect, QColor(255, 255, 255, 180))
-                            
-                            # Fiyat bilgisini yaz
-                            painter.setPen(Qt.darkBlue)
-                            painter.setFont(QFont("Arial", 8))
-                            painter.drawText(
-                                stall_x, 
-                                stall_draw_y - 5,
-                                stall_width,
-                                20,
-                                Qt.AlignCenter,
-                                price_text
-                            )
-                            
-                            # Stok bilgisini yaz
-                            painter.setPen(Qt.darkGreen)
-                            painter.drawText(
-                                stall_x, 
-                                stall_draw_y + 10,
-                                stall_width,
-                                20,
-                                Qt.AlignCenter,
-                                inventory_text
-                            )
-                            
-                            # Satıcı ismini yaz
-                            painter.setPen(Qt.darkRed)
-                            painter.setFont(QFont("Arial", 7))
-                            painter.drawText(
-                                stall_x, 
-                                stall_draw_y + 25,
-                                stall_width,
-                                20,
-                                Qt.AlignCenter,
-                                f"Satıcı: {stall.owner.name}"
-                            )
-                            
-                    print(f"Pazar tezgahı #{i+1} çizildi: Konum=({stall_x}, {stall_draw_y})")
+            # Pazar1'in 5 piksel sağına pazar2
+            market2_x = market1_x + market_width + 5
+            
+            # Kuyu'nun pozisyonu (draw_well metodunda kullanılacak)
+            # Pazar2'nin 10 piksel sağına kuyu
+            kuyu_x = market2_x + market_width + 10
+            # Kuyu boyutları
+            kuyu_width = 25
+            
+            # Kuyu'nun 10 piksel sağına pazar3
+            market3_x = kuyu_x + kuyu_width + 10
+            
+            # Pazar3'ün 5 piksel sağına pazar4
+            market4_x = market3_x + market_width + 5
+            
+            # Pazar tezgahlarının Y pozisyonu (hepsi aynı hizada)
+            # Tüm tezgahların kesinlikle aynı yükseklikte olması için sabit y değeri
+            market_y = self.height() - self.ground_height - market_height + 5
+            
+            # Kuyu'nun X pozisyonunu global olarak sakla (draw_well metodunda kullanılacak)
+            self.kuyu_x = kuyu_x
+            
+            # Pazar tezgahlarını çiz - her biri için farklı görsel kullanarak
+            market_positions = [market1_x, market2_x, market3_x, market4_x]
+            market_images = ["pazar1", "pazar2", "pazar3", "pazar4"]
+            
+            for i, market_x in enumerate(market_positions):
+                # Doğru pazarı seç
+                pazar_img = self.images[market_images[i]]
+                if not pazar_img:
+                    print(f"UYARI: {market_images[i]} resmi yüklenmemiş")
+                    continue
+                
+                # Tezgah resmini ölçeklendir
+                scaled_market = pazar_img.scaled(market_width, market_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                
+                # Tüm pazarlar için kesinlikle aynı y değerini kullan
+                # Tezgahı çiz - scaled_market'in boyutlarını dikkate alarak
+                painter.drawPixmap(int(market_x), int(market_y), scaled_market)
+                
+                # Game controller'a tezgah pozisyonunu bildir (eğer market ve stalls varsa)
+                if self.game_controller and hasattr(self.game_controller, 'market') and self.game_controller.market:
+                    market = self.game_controller.market
+                    if hasattr(market, 'stalls') and i < len(market.stalls):
+                        market.stalls[i].x = market_x + market_width/2
+                        market.stalls[i].y = market_y + market_height
+                
+                print(f"Pazar tezgahı #{i+1} ({market_images[i]}) çizildi: Konum=({int(market_x)}, {int(market_y)})")
             
         except Exception as e:
             print(f"HATA: Pazar çizme hatası: {e}")
@@ -1029,18 +1074,18 @@ class GroundWidget(QWidget):
                 return
             
             # Gardiyan boyutlarını ayarla
-            guard_width = 100
-            guard_height = 100
+            guard_width = 130
+            guard_height = 130
             
             # Gardiyan resmini ölçeklendir
             scaled_guard = self.images["gardiyan"].scaled(guard_width, guard_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
             # Kalenin sağında, kilise ve pazarın sonrasında olsun
             # Kilise 310'da, pazar yaklaşık 400, tezgahlar 660'a kadar
-            guard_x = 800  # Kilise ve pazardan sonra
+            guard_x = 850  # Kilise ve pazardan sonra
             
             # Y pozisyonunu kilise ile aynı seviyede hesapla (kilise Y=955'te çiziliyor)
-            guard_y = self.height() - self.ground_height - guard_height + 5
+            guard_y = self.height() - self.ground_height - guard_height + 20
             
             # Gardiyanı çiz
             painter.drawPixmap(guard_x, guard_y, scaled_guard)
@@ -1066,8 +1111,11 @@ class GroundWidget(QWidget):
             # Değirmen resmini ölçeklendir
             scaled_mill = self.images["degirmen"].scaled(mill_width, mill_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
-            # Kalenin konumundan 1500 piksel sağda
-            mill_x = 1500 + 10  # Kale 10 pikselde başlıyor
+            # Gardiyan kulesinin konumu
+             # draw_guard metodundan alındı
+            
+            # Değirmeni gardiyanın 40 piksel soluna yerleştir
+            mill_x = 1050
             
             # Y pozisyonunu hesapla (zemin üzerinde)
             mill_y = self.height() - self.ground_height - mill_height + 1
@@ -1083,31 +1131,34 @@ class GroundWidget(QWidget):
             traceback.print_exc()
 
     def draw_well(self, painter):
-        """Kuyuyu çiz"""
+        """Kuyuyu çiz - Pazar tezgahları arasına yerleştirilmiş olarak"""
         try:
             if not self.images["kuyu"]:
                 print("UYARI: Kuyu resmi yüklenmemiş")
                 return
             
             # Kuyu boyutlarını ayarla
-            well_width = 45
-            well_height = 45
+            well_width = 25
+            well_height = 25
             
             # Kuyu resmini ölçeklendir
             scaled_well = self.images["kuyu"].scaled(well_width, well_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
-            # Pazar2'nin konumundan 100 piksel sağda
-            # Pazarların konumu: base_x = 600 + 10
-            # Pazar2'nin konumu: base_x + market_width + 10 = 610 + 65 + 10 = 685
-            well_x = 685 + 90  # Pazar2'nin konumu + 100 piksel
+            # Kuyu pozisyonu
+            # draw_markets metodunda hesaplanan kuyu_x değerini kullan
+            if hasattr(self, 'kuyu_x'):
+                well_x = self.kuyu_x
+            else:
+                # Varsayılan konum (kuyu_x yoksa)
+                well_x = 370
             
-            # Y pozisyonunu hesapla (zemin üzerinde)
-            well_y = self.height() - self.ground_height - well_height + 7
+            # Y pozisyonunu hesapla (pazar tezgahlarıyla aynı seviyede)
+            well_y = self.height() - self.ground_height - well_height + 3
             
             # Kuyuyu çiz
-            painter.drawPixmap(well_x, well_y, scaled_well)
+            painter.drawPixmap(int(well_x), int(well_y), scaled_well)
             
-            print(f"Kuyu çizildi: Konum=({well_x}, {well_y}), Boyut={well_width}x{well_height}")
+            print(f"Kuyu çizildi: Konum=({int(well_x)}, {int(well_y)}), Boyut={well_width}x{well_height}")
             
         except Exception as e:
             print(f"HATA: Kuyu çizme hatası: {e}")
@@ -1115,227 +1166,307 @@ class GroundWidget(QWidget):
             traceback.print_exc()
 
     def draw_wolves(self, painter):
-        """Kurtları çiz - köylülere benzer şekilde"""
+        """Kurtları çiz"""
         try:
             # Game controller kontrolü
             if not hasattr(self, 'game_controller') or not self.game_controller:
-                print("UYARI: draw_wolves - game_controller bulunamadı")
+                print("Game controller bulunamadı, kurtlar çizilemedi")
                 return
                 
-            # Kurt resmi yüklü değilse çıkış yap
+            # Kurt resmi kontrolü
             if not self.images.get("kurt"):
-                print("UYARI: Kurt resmi yüklenmemiş")
+                print("UYARI: Kurt resmi yüklenemedi!")
                 return
                 
             # Kurtlar listesi kontrolü
             if not hasattr(self.game_controller, 'wolves') or not self.game_controller.wolves:
-                print("UYARI: draw_wolves - wolves listesi bulunamadı veya boş")
+                print("Kurtlar listesi boş veya bulunamadı")
                 return
             
-            print(f"Kurtlar çiziliyor... {len(self.game_controller.wolves)} kurt var")
+            # Zemin seviyesini hesapla
+            ground_y = self.height() - self.ground_height
             
             # Tüm kurtları çiz
-            for i, wolf in enumerate(self.game_controller.wolves):
+            for wolf in self.game_controller.wolves:
                 try:
-                    # Kurt varlığını görselleştir
-                    wolf_pixmap = self.images["kurt"]
+                    # Kurt boyutlarını ayarla
+                    wolf_width = int(getattr(wolf, 'width', 40))
+                    wolf_height = int(getattr(wolf, 'height', 30))
                     
-                    # Kurdun X ve Y pozisyonunu ayarla
-                    x = int(wolf.x)
+                    # Resmi ölçeklendir
+                    scaled_wolf = self.images["kurt"].scaled(wolf_width, wolf_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                     
-                    # Debug yazdır
-                    print(f"Kurt çiziliyor: #{wolf.wolf_id}, pozisyon: ({x}, {wolf.y})")
+                    # Kurdun yönünü kontrol et (direction_x kullan, yoksa direction)
+                    direction = getattr(wolf, 'direction_x', getattr(wolf, 'direction', 1))
                     
-                    # Int değerlerle çalış
-                    wolf_width = int(wolf.width)
-                    wolf_height = int(wolf.height)
+                    # Transformasyon matrisi oluştur
+                    transform = QTransform()
                     
-                    # Eğilme özelliği için kurdun Y pozisyonunu hesapla
-                    # Çömelme durumu varsa buna göre ayarla
-                    if hasattr(wolf, 'is_crouching') and wolf.is_crouching:
-                        crouch_offset = int(wolf.crouch_frame * 1.5)
-                        scaled_wolf = wolf_pixmap.scaled(wolf_width, wolf_height - crouch_offset, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                        wolf_y = int(self.height() - self.ground_height - (wolf_height - crouch_offset))
-                    else:
-                        # Sabit Y pozisyonu - zıplama yok
-                        scaled_wolf = wolf_pixmap.scaled(wolf_width, wolf_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                        wolf_y = int(self.height() - self.ground_height - wolf_height)
+                    # Yön kontrolü - direction değeri 1 ise sağa, -1 ise sola bakacak
+                    # NOT: Kurt resminin varsayılan yönünü kontrol edip, doğru transformasyonu uygula
+                    # Resim varsayılan olarak sola bakıyorsa, sağa hareket için çevir
+                    if direction > 0:  # Sağa gidiyorsa ve resim sola bakıyorsa çevir
+                        transform.scale(-1, 1)
                     
-                    # Kurt hareket yönüne göre görseli çevir
-                    if hasattr(wolf, 'direction_x') and wolf.direction_x > 0:  # Sağa gidiyorsa resmi çevir
-                        # Görüntüyü çevir - QTransform kullan
-                        transform = QTransform().scale(-1, 1)
-                        scaled_wolf = scaled_wolf.transformed(transform)
+                    # Rotasyonu uygula - animation_frame kullan
+                    rotation = 0
+                    if hasattr(wolf, 'animation_frame'):
+                        # Animasyon karesine göre rotasyon açısını belirle
+                        if wolf.animation_frame == 1:
+                            rotation = -5  # Sola eğilme
+                        elif wolf.animation_frame == 3:
+                            rotation = 5   # Sağa eğilme
                     
-                    # Eğilme animasyonunu uygula
-                    if hasattr(wolf, 'rotation') and wolf.rotation != 0:
-                        transform = QTransform()
-                        # Dönüşüm merkezini ayarla - tam sayıya dönüştür
-                        transform.translate(int(scaled_wolf.width() / 2), int(scaled_wolf.height()))
-                        transform.rotate(wolf.rotation)
-                        transform.translate(-int(scaled_wolf.width() / 2), -int(scaled_wolf.height()))
-                        scaled_wolf = scaled_wolf.transformed(transform)
+                    if rotation != 0:
+                        transform.rotate(rotation)
                     
-                    # Kurdu çiz - tüm değerleri int olarak dönüştür
-                    draw_x = int(x - scaled_wolf.width() // 2)
-                    draw_y = int(wolf_y)
-                    painter.drawPixmap(draw_x, draw_y, scaled_wolf)
+                    # Resmi dönüştür
+                    transformed_wolf = scaled_wolf.transformed(transform)
                     
-                    # Kurt durumunu göster
-                    if hasattr(wolf, 'state') and wolf.state:
-                        painter.setPen(Qt.white)
-                        text_width = int(wolf_width * 2)
-                        text_x = int(x - text_width // 2)
-                        text_y = int(wolf_y - 15)
-                        painter.drawText(text_x, text_y, text_width, 15, Qt.AlignCenter, wolf.state)
+                    # Kurdu çiz - zemin üzerinde
+                    x = int(wolf.x - wolf_width/2)
+                    y = int(ground_y - wolf_height)  # Zemin üzerinde
+                    painter.drawPixmap(x, y, transformed_wolf)
                     
-                    print(f"Kurt başarıyla çizildi: #{wolf.wolf_id}")
+                    # Yön bilgisini göster (Debug)
+                    if hasattr(wolf, 'direction') and hasattr(wolf, 'direction_x'):
+                        yontext = f"D:{wolf.direction} DX:{wolf.direction_x}"
+                        painter.setPen(Qt.red)
+                        painter.setFont(QFont("Arial", 7))
+                        painter.drawText(x, y - 10, yontext)
                     
                 except Exception as e:
-                    print(f"HATA: Kurt çizme hatası: {e}")
+                    print(f"HATA: Kurt çizim hatası: {e}")
                     import traceback
                     traceback.print_exc()
-            
+                
         except Exception as e:
-            print(f"HATA: Kurtları çizme hatası: {e}")
+            print(f"HATA: Kurtları çizerken hata: {e}")
             import traceback
             traceback.print_exc()
 
     def draw_birds(self, painter):
-        """Kuş ve kargaları çiz"""
+        """Kuşları çiz"""
         try:
             # Game controller kontrolü
             if not hasattr(self, 'game_controller') or not self.game_controller:
-                print("UYARI: draw_birds - game_controller bulunamadı")
                 return
                 
             # Kuşlar listesi kontrolü
             if not hasattr(self.game_controller, 'birds') or not self.game_controller.birds:
                 return
-                
-            print(f"Kuşlar çiziliyor... {len(self.game_controller.birds)} kuş var")
             
-            # Ağaç yüksekliği ve zemin seviyesi bilgilerini hesapla
-            ground_y = self.height() - self.ground_height
-            tree_height = 80  # Varsayılan ağaç yüksekliği
-            tree_top_y = ground_y - tree_height  # Ağacın tepesinin y koordinatı
-            
-            # Kuşların uçabileceği minimum ve maksimum yükseklikler
-            min_flight_y = tree_top_y  # Minimum uçuş yüksekliği (ağaç tepesi)
-            max_flight_y = tree_top_y - 100  # Maksimum uçuş yüksekliği (ağaç tepesinden 100px yukarı)
-                
-            # Tüm kuşları çiz
+            # Kuşları ve kargaları çiz
             for bird in self.game_controller.birds:
-                try:
-                    # Kuş tipine göre resmi seç
-                    bird_pixmap = self.images.get(bird.bird_type)
-                    
-                    if not bird_pixmap:
-                        print(f"UYARI: {bird.bird_type} resmi bulunamadı")
-                        continue
-                    
-                    # Kuş boyutları (daha küçük boyutlar)
-                    bird_width = int(bird.width * 0.6)  # %60 daha küçük
-                    bird_height = int(bird.height * 0.6)  # %60 daha küçük
-                    
-                    # Kuşun X ve Y pozisyonunu ayarla - tam sayı olarak
-                    x = int(bird.x)
-                    y = int(bird.y)
-                    
-                    # Uçuş animasyonu için yükseklik kontrolü
-                    if hasattr(bird, 'is_taking_off') and bird.is_taking_off:
-                        # Ağaçtan yükselme animasyonu - ağacın konumundan başla
-                        source_tree_x = bird.source_tree_x
-                        
-                        # Animasyon ilerleme kontrolü - kaynak ağaca yakın ise
-                        distance_from_source = abs(x - source_tree_x)
-                        if distance_from_source < 50:
-                            # Kuşun kanat çırpma animasyonunu hızlandır
-                            bird.wing_cycle_speed = 12.0
-                            
-                            # Kuşun uçuş yüksekliğini kademeli olarak artır
-                            flight_progress = min(1.0, distance_from_source / 50.0)
-                            
-                            # Ağacın tepesinden hedef yüksekliğe yükselme (yukarı doğru) - sınırlı yükseklik
-                            smooth_progress = flight_progress * flight_progress  # Easing fonksiyonu
-                            max_altitude_gain = min(100, tree_top_y - max_flight_y)  # En fazla 100px yükselme
-                            
-                            # Yukarı doğru yükselme - kısıtlı bir alanda
-                            altitude_gain = max_altitude_gain * smooth_progress
-                            y = int(tree_top_y - altitude_gain)
-                            
-                            # Animasyon debug bilgisi
-                            print(f"Kuş yükseliyor: #{bird.bird_id}, ilerleme: {smooth_progress:.2f}, ağaç_tepe_y: {tree_top_y}, y: {y}")
-                            
-                            # Bird nesnesinin y koordinatını güncelle (game_controller'da kullanılabilmesi için)
-                            bird.y = y
-                    else:
-                        # Normal uçuş - kuş.y değerini kullan, ancak yükseklik sınırlarına dikkat et
-                        # Kuş çok yükseğe çıkmışsa sınırla
-                        if y < max_flight_y:
-                            y = max_flight_y
-                            bird.y = float(y)
-                            
-                        # Kuş ağaç seviyesi altındaysa sınırla
-                        elif y > min_flight_y:
-                            y = min_flight_y
-                            bird.y = float(y)
-                    
-                    # Debug yazdır
-                    print(f"Kuş çiziliyor: {bird.bird_type} #{bird.bird_id}, pozisyon: ({x}, {y})")
-                    
-                    # Kuş resmini ölçeklendir
-                    scaled_bird = bird_pixmap.scaled(bird_width, bird_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    
-                    # Kuş hareket yönüne göre görseli çevir
-                    if bird.direction_x < 0:  # Sola gidiyorsa
-                        # Görüntüyü çevir - QTransform kullan
-                        mirror_transform = QTransform().scale(-1, 1)
-                        scaled_bird = scaled_bird.transformed(mirror_transform)
-                    
-                    # Kanat çırpma animasyonu (geliştirilmiş)
-                    if hasattr(bird, 'wing_angle') and bird.wing_angle != 0:
-                        # Yeni yöntem: Kanatları döndürmek yerine kuşun gövdesini hafifçe eğ
-                        # Kanat açısına göre uçuş yönü eğimi
-                        flight_tilt = bird.wing_angle * 0.2  # Daha az eğim
-                        transform = QTransform()
-                        transform.rotate(flight_tilt)
-                        scaled_bird = scaled_bird.transformed(transform)
-                        
-                        # Ek olarak, kanat çırpma döngüsü pozisyonuna göre hafif dikey hareket ekle
-                        if hasattr(bird, 'wing_cycle_position'):
-                            # Sinüs dalgasıyla yumuşak bir yukarı-aşağı hareketi
-                            vertical_offset = math.sin(bird.wing_cycle_position * 2 * math.pi) * 2
-                            y += int(vertical_offset)
-                    
-                    # Kuşu çiz - tüm değerleri int olarak dönüştür
-                    draw_x = int(x - scaled_bird.width() // 2)
-                    draw_y = int(y)
-                    painter.drawPixmap(draw_x, draw_y, scaled_bird)
-                    
-                    # Debug: Kuş durumunu göster (istenirse bu kısım kaldırılabilir)
-                    if hasattr(bird, 'state') and bird.state and bird.state != "Uçuyor":
-                        # Sadece özel durumlar için etiket göster
-                        painter.setPen(Qt.white)
-                        text_width = int(bird_width * 2)
-                        text_x = int(x - text_width // 2)
-                        text_y = int(y - 15)
-                        
-                        # Yarı-saydam arka plan
-                        text_rect = QRect(text_x, text_y, text_width, 15)
-                        painter.fillRect(text_rect, QColor(0, 0, 0, 100))
-                        
-                        # Metni çiz
-                        painter.drawText(text_x, text_y, text_width, 15, Qt.AlignCenter, bird.state)
-                    
-                    print(f"Kuş başarıyla çizildi: {bird.bird_type} #{bird.bird_id}")
-                    
-                except Exception as e:
-                    print(f"HATA: Kuş çizme hatası: {e}")
-                    import traceback
-                    traceback.print_exc()
+                # Bird type kontrolü
+                bird_type = getattr(bird, 'bird_type', "kuş")  # Varsayılan olarak "kuş"
+                
+                # Doğru resmi seç
+                if bird_type == "karga":
+                    img = self.images.get("karga")
+                else:  # "kuş" varsayılan
+                    img = self.images.get("kus")
+                
+                if not img:
+                    continue
+                
+                # Kuş boyutlarını ayarla
+                bird_width = int(getattr(bird, 'width', 30))
+                bird_height = int(getattr(bird, 'height', 20))
+                
+                # Resmi ölçeklendir
+                scaled_img = img.scaled(bird_width, bird_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                
+                # Kuşun yönünü kontrol et ve gerekirse resmi çevir
+                direction = getattr(bird, 'direction', 1)  # Varsayılan olarak sağa doğru
+                
+                if direction == -1:  # Sola doğru uçuyorsa
+                    transform = QTransform().scale(-1, 1)  # X ekseninde çevir
+                    scaled_img = scaled_img.transformed(transform)
+                
+                # Kuşu çiz
+                x = int(bird.x - bird_width/2)
+                y = int(bird.y - bird_height/2)
+                painter.drawPixmap(x, y, scaled_img)
+                
+                # Debug bilgisi yazdır
+                # print(f"{bird_type.capitalize()} #{bird.bird_id} çizildi: ({x}, {y})")
             
         except Exception as e:
-            print(f"HATA: Kuşları çizme hatası: {e}")
+            print(f"HATA: Kuşları çizerken hata: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_inn(self, painter):
+        """Hanı çiz"""
+        try:
+            if not self.images["han"]:
+                print("UYARI: Han resmi yüklenmemiş")
+                return
+            
+            # Han boyutlarını ayarla
+            inn_width = 90
+            inn_height = 90
+            
+            # Han resmini ölçeklendir
+            scaled_inn = self.images["han"].scaled(inn_width, inn_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Pazarın son tezgahının konumunu hesapla (pazarın 10 piksel sağına yerleştirmek için)
+ 
+            inn_x = 200
+            
+            # Y pozisyonunu hesapla (zemin üzerinde, diğer yapılarla aynı)
+            inn_y = self.height() - self.ground_height - inn_height + 20
+            
+            # Koordinatları int'e dönüştür, drawPixmap int değer bekliyor
+            inn_x_int = int(inn_x)
+            inn_y_int = int(inn_y)
+            
+            # Hanı çiz
+            painter.drawPixmap(inn_x_int, inn_y_int, scaled_inn)
+            
+            print(f"Han çizildi: Konum=({inn_x_int}, {inn_y_int}), Boyut={inn_width}x{inn_height}")
+            
+        except Exception as e:
+            print(f"HATA: Han çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_wall(self, painter):
+        """Duvarı çiz - zeminin üstünde, yatay olarak (parçaları üst üste bindirerek)"""
+        try:
+            # Duvar resmi yüklü değilse çıkış yap
+            if self.images["duvar"] is None:
+                print("UYARI: Duvar resmi yüklenemediği için çizilemedi")
+                return
+            
+            # Duvar resmi boyutlarını ayarla
+            duvar_width = 25  # Zemin ile aynı genişlik
+            duvar_height = 40  # Duvar yüksekliği
+            
+            # Duvar resmini ölçeklendir
+            scaled_duvar = self.images["duvar"].scaled(duvar_width, duvar_height, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+            
+            # Duvarın başlangıç ve bitiş noktalarını belirle
+            start_x = 0  # En soldan başla
+            end_x = 900  # Gardiyan kulesine kadar
+            
+            # Duvarın y pozisyonu - zemin üzerinde, köylülerin yürüdüğü seviyede
+            wall_y = self.height() - self.ground_height - duvar_height + 4
+            
+            # Duvar parçalarını önemli derecede üst üste bindirerek çiz
+            # Her parçayı bir öncekiyle %50 üst üste binerek yerleştir
+            overlap = int(duvar_width * 0.5)  # %50 üst üste binme
+            step = duvar_width - overlap
+            
+            # x pozisyonlarını hesapla
+            positions = []
+            current_x = start_x
+            while current_x < end_x:
+                positions.append(current_x)
+                current_x += step
+            
+            # Her pozisyona duvar parçasını çiz
+            for x in positions:
+                painter.drawPixmap(int(x), int(wall_y), scaled_duvar)
+            
+            print(f"Duvar çizildi: {len(positions)} adet parça, %{int(overlap/duvar_width*100)} üst üste bindirme oranı")
+            
+        except Exception as e:
+            print(f"HATA: Duvar çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_lanterns(self, painter):
+        """Fenerleri belirtilen konumlara çiz"""
+        try:
+            if not self.images["fener"]:
+                print("UYARI: Fener resmi yüklenmemiş")
+                return
+            
+            # Fener boyutunu ayarla
+            fener_width = 15
+            fener_height = 20
+            
+            # Fener resmini ölçeklendir
+            scaled_fener = self.images["fener"].scaled(fener_width, fener_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Aynalanan fener için QTransform kullan
+            transform = QTransform().scale(-1, 1)  # X ekseninde aynala
+            mirrored_fener = scaled_fener.transformed(transform)
+            
+            # Zemin seviyesini hesapla
+            ground_y = self.height() - self.ground_height
+            
+            # Fenerin y pozisyonu (zemin üstünde)
+            fener_y = ground_y - fener_height + 1
+            
+            # 1. Fener: Kalenin 6 piksel sağı
+            # Kale x pozisyonu + kale genişliği + 6
+            kale_x = 1  # draw_castle metodundan
+            kale_width = 190  # draw_castle metodundan
+            fener1_x = kale_x + kale_width + 6
+            painter.drawPixmap(int(fener1_x), int(fener_y), scaled_fener)
+            print(f"Fener 1 çizildi: Konum=({int(fener1_x)}, {int(fener_y)})")
+            
+            # 2. Fener: Hanın 15 piksel sağı (AYNALANIYOR)
+            han_x = 200  # draw_inn metodundan
+            han_width = 90  # draw_inn metodundan
+            fener2_x = han_x + han_width + 15
+            painter.drawPixmap(int(fener2_x), int(fener_y), mirrored_fener)  # Aynalanan fener kullanılıyor
+            print(f"Fener 2 çizildi (aynalı): Konum=({int(fener2_x)}, {int(fener_y)})")
+            
+            # 3. Fener: pazar4'ün 6 piksel sağı
+            # market_positions ve market_width değerlerini draw_markets metodundan alıyoruz
+            # pazar4 en sağdaki tezgah (market4_x)
+            market4_x = self.kuyu_x + 25 + 10 + 30 + 5  # draw_markets metodundan hesapla
+            market_width = 30  # draw_markets metodundan
+            fener3_x = market4_x + market_width + 6
+            painter.drawPixmap(int(fener3_x), int(fener_y), scaled_fener)
+            print(f"Fener 3 çizildi: Konum=({int(fener3_x)}, {int(fener_y)})")
+            
+            # 4. Fener: Kilisenin 6 piksel sağı (AYNALANIYOR)
+            church_x = 520  # draw_church metodundan
+            church_width = 85  # draw_church metodundan
+            fener4_x = church_x + church_width + 6
+            painter.drawPixmap(int(fener4_x), int(fener_y), mirrored_fener)  # Aynalanan fener kullanılıyor
+            print(f"Fener 4 çizildi (aynalı): Konum=({int(fener4_x)}, {int(fener_y)})")
+            
+        except Exception as e:
+            print(f"HATA: Fener çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_stable(self, painter):
+        """Ahırı çiz - Kilisenin 50 piksel sağında"""
+        try:
+            if not self.images["ahir"]:
+                print("UYARI: Ahır resmi yüklenmemiş")
+                return
+            
+            # Ahır boyutlarını ayarla
+            stable_width = 80
+            stable_height = 70
+            
+            # Ahır resmini ölçeklendir
+            scaled_stable = self.images["ahir"].scaled(stable_width, stable_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Kilisenin konumu ve genişliği (draw_church metodundan)
+            church_x = 520
+            church_width = 90
+            
+            # Ahırın konumunu hesapla (kilisenin 50 piksel sağı)
+            stable_x = church_x + church_width + 50
+            
+            # Y pozisyonunu hesapla (zemin üzerinde, diğer yapılarla hizalı)
+            stable_y = self.height() - self.ground_height - stable_height + 12
+            
+            # Ahırı çiz
+            painter.drawPixmap(int(stable_x), int(stable_y), scaled_stable)
+            
+            print(f"Ahır çizildi: Konum=({int(stable_x)}, {int(stable_y)}), Boyut={stable_width}x{stable_height}")
+            
+        except Exception as e:
+            print(f"HATA: Ahır çizme hatası: {e}")
             import traceback
             traceback.print_exc()
