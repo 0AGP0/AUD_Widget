@@ -16,6 +16,7 @@ from ..models.house import House
 from ..models.wolf import Wolf
 from ..models.bird import Bird
 from ..models.market import Market, MarketStall
+from ..models.cow import Cow
 from ..models.ai.dialogue.dialogue_manager import DialogueManager
 from ..utils.constants import MALE_NAMES, FEMALE_NAMES, PROFESSIONS
 
@@ -58,6 +59,7 @@ class GameController(QObject):
         self.market = None
         self.wolves = []
         self.birds = []
+        self.cows = []  # İnekler listesi eklendi
         self.structures = []  # Yapılar listesi eklendi
         
         # Kurt oluşturma parametreleri
@@ -184,6 +186,11 @@ class GameController(QObject):
             # Kurtları oluştur
             print("Kurtlar oluşturuluyor...")
             self.create_wolves()
+            
+            # İnekleri oluştur
+            print("İnekler oluşturuluyor...")
+            self.create_cows()
+            print("İnekler oluşturuldu")
             
             # Kontrol panelini güncelle
             print("Kontrol paneli güncelleniyor...")
@@ -1559,6 +1566,9 @@ class GameController(QObject):
                     if not house.is_owned() and house.for_sale:
                         self.try_sell_house(house)
             
+            # İnekleri güncelle
+            self.update_cows()
+            
         except Exception as e:
             print(f"HATA: Oyun döngüsü hatası: {e}")
             import traceback
@@ -1721,6 +1731,9 @@ class GameController(QObject):
                 if hasattr(wolf, 'update'):
                     wolf.update()
             
+            # İnekleri güncelle
+            self.update_cows()
+            
             # İnşaat alanlarını güncelle
             self.update_building_sites()
             
@@ -1747,4 +1760,53 @@ class GameController(QObject):
         except Exception as e:
             print(f"HATA: Oyun döngüsü güncelleme hatası: {e}")
             import traceback
-            traceback.print_exc() 
+            traceback.print_exc()
+
+    def create_cows(self):
+        """İnekleri oluştur - Ahır ile balya arasındaki çitlerin arkasında"""
+        try:
+            # Ahırın konumu ve boyutları
+            church_x = 520
+            church_width = 90
+            stable_x = church_x + church_width + 50
+            stable_width = 80
+            
+            # Balyanın konumu
+            hay_bale_x = stable_x + stable_width + 60
+            
+            # Çit sınırları
+            fence_start_x = stable_x + stable_width - 30
+            fence_end_x = hay_bale_x
+            
+            # İnek boyutları
+            cow_width = 35
+            
+            # İneklerin hareket alanı sınırları
+            min_x = fence_start_x + cow_width
+            max_x = fence_end_x - cow_width
+            
+            # İki inek oluştur
+            for i in range(2):
+                # Rastgele başlangıç pozisyonu
+                start_x = random.uniform(min_x, max_x)
+                
+                # İneği oluştur ve listeye ekle
+                cow = Cow(x=start_x, y=self.ground_y, min_x=min_x, max_x=max_x)
+                self.cows.append(cow)
+                
+            print(f"{len(self.cows)} inek oluşturuldu")
+            
+        except Exception as e:
+            print(f"HATA: İnek oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def update_cows(self):
+        """İnekleri güncelle"""
+        try:
+            for cow in self.cows:
+                cow.update()
+        except Exception as e:
+            print(f"HATA: İnek güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc()

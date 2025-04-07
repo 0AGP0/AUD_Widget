@@ -14,8 +14,8 @@ class Villager:
     appearance: int = 0
     x: float = 0.0
     y: float = 0.0
-    width: int = 13  # Köylü genişliği (40'tan 20'ye düşürüldü)
-    height: int = 13  # Köylü yüksekliği (40'tan 20'ye düşürüldü)
+    width: int = 15  # Köylü genişliği (40'tan 20'ye düşürüldü)
+    height: int = 15  # Köylü yüksekliği (40'tan 20'ye düşürüldü)
     direction: int = 1  # 1 = sağa, -1 = sola
     direction_x: int = 1  # 1 = sağa, -1 = sola (çizim için)
     health: int = 100
