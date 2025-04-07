@@ -52,7 +52,12 @@ class GroundWidget(QWidget):
             "han": None,  # Han resmi
             "duvar": None,  # Duvar resmi
             "fener": None,   # Fener resmi
-            "ahir": None   # Ahır resmi
+            "ahir": None,    # Ahır resmi
+            "balya": None,    # Balya resmi
+            "cit": None,    # Çit resmi
+            "araba": None,    # Araba resmi
+            "torch": None,     # Meşale resmi
+            "fici": None      # Fıçı resmi
         }
         
         # Resimleri yükle
@@ -85,7 +90,12 @@ class GroundWidget(QWidget):
                 "han": None,  # Han resmi
                 "duvar": None,  # Duvar resmi
                 "fener": None,   # Fener resmi
-                "ahir": None   # Ahır resmi
+                "ahir": None,    # Ahır resmi
+                "balya": None,    # Balya resmi
+                "cit": None,    # Çit resmi
+                "araba": None,    # Araba resmi
+                "torch": None,     # Meşale resmi
+                "fici": None      # Fıçı resmi
             }
             
             # Ağaç resimlerini yükle
@@ -156,7 +166,7 @@ class GroundWidget(QWidget):
                 if os.path.exists(pazar_path):
                     self.images[f"pazar{i}"] = QPixmap(pazar_path)
                     print(f"{pazar_type} resmi yüklendi: {pazar_path}")
-                else:
+            else:
                     print(f"UYARI: {pazar_type} resmi bulunamadı: {pazar_path}")
             
             # Kilise resmini yükle
@@ -245,6 +255,46 @@ class GroundWidget(QWidget):
                 print(f"Ahır resmi yüklendi: {ahir_path}")
             else:
                 print(f"UYARI: Ahır resmi bulunamadı: {ahir_path}")
+            
+            # Balya resmini yükle
+            balya_path = os.path.join("src", "assets", "balya.png")
+            if os.path.exists(balya_path):
+                self.images["balya"] = QPixmap(balya_path)
+                print(f"Balya resmi yüklendi: {balya_path}")
+            else:
+                print(f"UYARI: Balya resmi bulunamadı: {balya_path}")
+            
+            # Çit resmini yükle
+            cit_path = os.path.join("src", "assets", "cit.png")
+            if os.path.exists(cit_path):
+                self.images["cit"] = QPixmap(cit_path)
+                print(f"Çit resmi yüklendi: {cit_path}")
+            else:
+                print(f"UYARI: Çit resmi bulunamadı: {cit_path}")
+            
+            # Araba resmini yükle
+            araba_path = os.path.join("src", "assets", "araba.png")
+            if os.path.exists(araba_path):
+                self.images["araba"] = QPixmap(araba_path)
+                print(f"Araba resmi yüklendi: {araba_path}")
+            else:
+                print(f"UYARI: Araba resmi bulunamadı: {araba_path}")
+            
+            # Meşale resmini yükle
+            torch_path = os.path.join("src", "assets", "torch.png")
+            if os.path.exists(torch_path):
+                self.images["torch"] = QPixmap(torch_path)
+                print(f"Meşale resmi yüklendi: {torch_path}")
+            else:
+                print(f"UYARI: Meşale resmi bulunamadı: {torch_path}")
+            
+            # Fıçı resmini yükle
+            fici_path = os.path.join("src", "assets", "fici.png")
+            if os.path.exists(fici_path):
+                self.images["fici"] = QPixmap(fici_path)
+                print(f"Fıçı resmi yüklendi: {fici_path}")
+            else:
+                print(f"UYARI: Fıçı resmi bulunamadı: {fici_path}")
             
             print("Resimler yüklendi")
             # Resimlerin yüklendiğini işaretle
@@ -345,6 +395,10 @@ class GroundWidget(QWidget):
             if self.game_controller and hasattr(self.game_controller, 'wolves'):
                 self.draw_wolves(painter)
             
+            # Çiti çiz - ahır ile balya arasına
+            if self.images["cit"]:
+                self.draw_fence(painter)
+            
             # ---- Yapıları çiz (hepsi ağaçlardan sonra) ----
             
             # Kaleyi çiz
@@ -359,6 +413,18 @@ class GroundWidget(QWidget):
             if self.images["ahir"]:
                 self.draw_stable(painter)
             
+            # Balyayı çiz
+            if self.images["balya"]:
+                self.draw_hay_bale(painter)
+            
+            # Arabayı çiz
+            if self.images["araba"]:
+                self.draw_cart(painter)
+            
+            # Fıçıyı çiz - Han'ın arkasında
+            if self.images["fici"]:
+                self.draw_barrel(painter)
+            
             # Pazarı çiz
             if self.game_controller and hasattr(self.game_controller, 'market'):
                 self.draw_markets(painter)
@@ -370,6 +436,10 @@ class GroundWidget(QWidget):
             # Gardiyanı çiz
             if self.images["gardiyan"]:
                 self.draw_guard(painter)
+            
+            # Meşaleyi çiz
+            if self.images["torch"]:
+                self.draw_torch(painter)
             
             # Değirmeni çiz
             if self.images["degirmen"]:
@@ -465,6 +535,10 @@ class GroundWidget(QWidget):
             castle_height = 190
             scaled_castle = self.images["castle"].scaled(castle_width, castle_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
+            # Kaleyi x ekseni boyunca aynala
+            transform = QTransform().scale(-1, 1)  # X ekseninde aynala
+            scaled_castle = scaled_castle.transformed(transform)
+            
             # Kale pozisyonu - sol tarafta, zemin üzerinde
             x = 1
             # Zemin seviyesini hesapla
@@ -530,7 +604,7 @@ class GroundWidget(QWidget):
                 
                 # Ağacın ekrandaki pozisyonu
                 tree_x = int(tree.x - tree.width / 2)
-                tree_y = self.height() - self.ground_height - tree.height + 2 # +2'den +15'e değiştirildi
+                tree_y = self.height() - self.ground_height - tree.height  # +2'den +15'e değiştirildi
                 
                 # Ağacı çiz
                 painter.drawPixmap(tree_x, tree_y, tree.width, tree.height, tree_img)
@@ -1082,7 +1156,7 @@ class GroundWidget(QWidget):
             
             # Kalenin sağında, kilise ve pazarın sonrasında olsun
             # Kilise 310'da, pazar yaklaşık 400, tezgahlar 660'a kadar
-            guard_x = 850  # Kilise ve pazardan sonra
+            guard_x = 870  # Kilise ve pazardan sonra
             
             # Y pozisyonunu kilise ile aynı seviyede hesapla (kilise Y=955'te çiziliyor)
             guard_y = self.height() - self.ground_height - guard_height + 20
@@ -1468,5 +1542,198 @@ class GroundWidget(QWidget):
             
         except Exception as e:
             print(f"HATA: Ahır çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_hay_bale(self, painter):
+        """Balyayı çiz - Ahırın 100 piksel sağında"""
+        try:
+            if not self.images["balya"]:
+                print("UYARI: Balya resmi yüklenmemiş")
+                return
+            
+            # Balya boyutlarını ayarla
+            hay_bale_width = 15
+            hay_bale_height = 10
+            
+            # Balya resmini ölçeklendir
+            scaled_hay_bale = self.images["balya"].scaled(hay_bale_width, hay_bale_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Ahırın konumu ve genişliği (draw_stable metodundan)
+            church_x = 520
+            church_width = 90
+            stable_x = church_x + church_width + 50  # Kilisenin 50 piksel sağı
+            stable_width = 80  # Ahır genişliği
+            
+            # Balyanın konumunu hesapla (ahırın 100 piksel sağı)
+            hay_bale_x = stable_x + stable_width + 80
+            
+            # Y pozisyonunu hesapla (zemin üzerinde, diğer yapılarla hizalı)
+            hay_bale_y = self.height() - self.ground_height - hay_bale_height + 2
+            
+            # Balyayı çiz
+            painter.drawPixmap(int(hay_bale_x), int(hay_bale_y), scaled_hay_bale)
+            
+            print(f"Balya çizildi: Konum=({int(hay_bale_x)}, {int(hay_bale_y)}), Boyut={hay_bale_width}x{hay_bale_height}")
+            
+        except Exception as e:
+            print(f"HATA: Balya çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_fence(self, painter):
+        """Çiti çiz - Ahır ile balya arasında, yatay olarak"""
+        try:
+            # Çit resmi yüklü değilse çıkış yap
+            if self.images["cit"] is None:
+                print("UYARI: Çit resmi yüklenemediği için çizilemedi")
+                return
+            
+            # Çit resmi boyutlarını ayarla
+            cit_width = 30  # Çit parçasının genişliği
+            cit_height = 35  # Çit parçasının yüksekliği
+            
+            # Çit resmini ölçeklendir
+            scaled_cit = self.images["cit"].scaled(cit_width, cit_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Ahırın konumu ve boyutları (draw_stable metodundan)
+            church_x = 520
+            church_width = 90
+            stable_x = church_x + church_width + 50  # Kilisenin 50 piksel sağı
+            stable_width = 80  # Ahır genişliği
+            
+            # Balyanın konumu (draw_hay_bale metodundan)
+            hay_bale_x = stable_x + stable_width + 60
+            
+            # Çitin başlangıç ve bitiş noktalarını belirle
+            start_x = stable_x + stable_width -30  # Ahırın bitişinden başla
+            end_x = hay_bale_x  # Balyanın başlangıcında bitir
+            
+            # Çitin y pozisyonu - zemin üzerinde, köylülerin yürüdüğü seviyede
+            fence_y = self.height() - self.ground_height - cit_height + 15
+            
+            # Çit parçalarını üst üste bindirerek çiz
+            # Her parçayı bir öncekiyle %30 üst üste binerek yerleştir
+            overlap = int(cit_width * 0.3)  # %30 üst üste binme
+            step = cit_width - overlap
+            
+            # Kaç tane çit parçası gerektiğini hesapla
+            fence_width = end_x - start_x
+            tile_count = int(fence_width / step) + 1  # +1 ekstra parça (sağ kenar için)
+            
+            # Her pozisyona çit parçasını çiz
+            for i in range(tile_count):
+                x = start_x + (i * step)
+                painter.drawPixmap(int(x), int(fence_y), scaled_cit)
+            
+            print(f"Çit çizildi: {tile_count} adet parça, toplam genişlik: {fence_width} piksel, üst üste bindirme: {overlap} piksel")
+            
+        except Exception as e:
+            print(f"HATA: Çit çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_cart(self, painter):
+        """Arabayı çiz - Balyanın 2 piksel sağında"""
+        try:
+            if not self.images["araba"]:
+                print("UYARI: Araba resmi yüklenmemiş")
+                return
+            
+            # Araba boyutlarını ayarla
+            cart_width = 50
+            cart_height = 40
+            
+            # Araba resmini ölçeklendir
+            scaled_cart = self.images["araba"].scaled(cart_width, cart_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Balya konumu ve boyutları (draw_hay_bale metodundan)
+            church_x = 520
+            church_width = 90
+            stable_x = church_x + church_width + 50  # Kilisenin 50 piksel sağı
+            stable_width = 80  # Ahır genişliği
+            hay_bale_x = stable_x + stable_width + 80  # Balya x konumu
+            hay_bale_width = 15  # Balya genişliği
+            
+            # Arabanın konumu (balyanın 2 piksel sağı)
+            cart_x = hay_bale_x + hay_bale_width + 2
+            
+            # Y pozisyonunu hesapla (zemin üzerinde, diğer yapılarla hizalı)
+            cart_y = self.height() - self.ground_height - cart_height + 14
+            
+            # Arabayı çiz
+            painter.drawPixmap(int(cart_x), int(cart_y), scaled_cart)
+            
+            print(f"Araba çizildi: Konum=({int(cart_x)}, {int(cart_y)}), Boyut={cart_width}x{cart_height}")
+            
+        except Exception as e:
+            print(f"HATA: Araba çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_torch(self, painter):
+        """Meşaleyi çiz - Gardiyan kulesinin 2 piksel sağında"""
+        try:
+            if not self.images["torch"]:
+                print("UYARI: Meşale resmi yüklenmemiş")
+                return
+            
+            # Meşale boyutlarını ayarla
+            torch_width = 10
+            torch_height = 20
+            
+            # Meşale resmini ölçeklendir
+            scaled_torch = self.images["torch"].scaled(torch_width, torch_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Gardiyan kulesi konumu ve boyutları (draw_guard metodundan)
+            guard_x = 870  # Gardiyan kulesi x konumu
+            guard_width = 130  # Gardiyan kulesi genişliği
+            
+            # Meşalenin konumunu hesapla (gardiyan kulesinin 2 piksel sağı)
+            torch_x = guard_x + guard_width - 63
+            
+            # Y pozisyonunu hesapla (zemin üzerinde, diğer yapılarla hizalı)
+            torch_y = self.height() - self.ground_height - torch_height
+            
+            # Meşaleyi çiz
+            painter.drawPixmap(int(torch_x), int(torch_y), scaled_torch)
+            
+            print(f"Meşale çizildi: Konum=({int(torch_x)}, {int(torch_y)}), Boyut={torch_width}x{torch_height}")
+            
+        except Exception as e:
+            print(f"HATA: Meşale çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_barrel(self, painter):
+        """Fıçıyı çiz - Han'ın hemen arkasında"""
+        try:
+            if not self.images["fici"]:
+                print("UYARI: Fıçı resmi yüklenmemiş")
+                return
+            
+            # Fıçı boyutlarını ayarla
+            barrel_width = 10
+            barrel_height = 10
+            
+            # Fıçı resmini ölçeklendir
+            scaled_barrel = self.images["fici"].scaled(barrel_width, barrel_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Han'ın konumu (draw_inn metodundan)
+            inn_x = 200
+            inn_width = 90
+            inn_y = self.height() - self.ground_height - 40 # Han'ın y konumu
+            
+            # Fıçının konumunu hesapla (Han'ın arkasına yerleştir)
+            barrel_x = 190  # Han'ın ortasına hizala
+            barrel_y = inn_y # Han'ın biraz arkasında/üstünde olacak şekilde
+            
+            # Fıçıyı çiz
+            painter.drawPixmap(int(barrel_x), int(barrel_y), scaled_barrel)
+            
+            print(f"Fıçı çizildi: Konum=({int(barrel_x)}, {int(barrel_y)}), Boyut={barrel_width}x{barrel_height}")
+            
+        except Exception as e:
+            print(f"HATA: Fıçı çizme hatası: {e}")
             import traceback
             traceback.print_exc()
