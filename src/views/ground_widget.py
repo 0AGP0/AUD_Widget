@@ -1943,24 +1943,28 @@ class GroundWidget(QWidget):
             # İneklerin Y pozisyonu (zemin üzerinde, çitlerin arkasında)
             cow_y = self.height() - self.ground_height - cow_height + 15
             
-            # İki inek için pozisyonları hesapla ve çiz
-            # İneklerin pozisyonlarını ve yönlerini game_controller'dan al
+            # İnekleri çiz
             if hasattr(self.game_controller, 'cows'):
                 for cow in self.game_controller.cows:
                     # İneğin yönünü kontrol et
                     transform = QTransform()
-                    if cow.direction_x < 0:  # Sola gidiyorsa
+                    if hasattr(cow, 'direction_x') and cow.direction_x < 0:  # Sola gidiyorsa
                         transform.scale(-1, 1)  # Yatay eksende çevir
                     
-                    # Transformasyonu uygula
+                    # Transformasyonu uygula (ölçeklendirilmiş resme)
                     transformed_cow = scaled_cow.transformed(transform)
                     
-                    # İneği çiz
+                    # İneği pozisyona çiz - burada cow.x değeri önemli
                     x = int(cow.x - cow_width/2)
                     y = int(cow_y)
                     painter.drawPixmap(x, y, transformed_cow)
                     
-                    print(f"İnek çizildi: Konum=({x}, {y}), Yön={cow.direction_x}")
+                    # Hata ayıklama bilgisi için dikdörtgen çiz (geliştirme aşamasında yardımcı olur)
+                    if False:  # Gerekirse True yapılabilir
+                        painter.setPen(QPen(Qt.red, 1, Qt.DashLine))
+                        painter.drawRect(x, y, cow_width, cow_height)
+                        painter.setPen(QPen(Qt.blue, 1))
+                        painter.drawLine(int(cow.x), y, int(cow.x), y + cow_height)
             else:
                 print("UYARI: Game controller'da cows listesi bulunamadı")
             

@@ -136,6 +136,10 @@ class GameController(QObject):
         try:
             print("Oyun kuruluyor...")
             
+            # Oyunu aktif et
+            self.is_running = True
+            print("Oyun aktif edildi - is_running = True")
+            
             # Gece/gündüz döngüsünü başlat
             print("Gece/gündüz döngüsü başlatılıyor...")
             self.start_day_night_cycle()
@@ -190,7 +194,10 @@ class GameController(QObject):
             # İnekleri oluştur
             print("İnekler oluşturuluyor...")
             self.create_cows()
-            print("İnekler oluşturuldu")
+            print(f"{len(self.cows)} inek oluşturuldu")
+            print(f"İnek 1 pozisyon: x={self.cows[0].x if self.cows else 'yok'}, "
+                  f"min_x={self.cows[0].min_x if self.cows else 'yok'}, "
+                  f"max_x={self.cows[0].max_x if self.cows else 'yok'}")
             
             # Kontrol panelini güncelle
             print("Kontrol paneli güncelleniyor...")
@@ -210,7 +217,11 @@ class GameController(QObject):
             self.timer.timeout.connect(self.update_game)
             self.timer.start(8)  # ~120 FPS (16ms -> 8ms)
             
-            print("Oyun kurulumu tamamlandı")
+            # Oyun döngüsü zamanlayıcısını başlat
+            print("Oyun döngüsü zamanlayıcısı başlatılıyor...")
+            self.game_timer.start(500)  # Her 500ms'de bir güncelle
+            
+            print("Oyun kurulumu tamamlandı - is_running = " + str(self.is_running))
             
         except Exception as e:
             print(f"HATA: Oyun kurulum hatası: {e}")
@@ -527,16 +538,11 @@ class GameController(QObject):
             # Kuşları güncelle
             self.update_birds()
             
+            # İnekleri güncelle
+            self.update_cows()
+            
             # Pazar tezgahlarını güncelle
             self.update_market_stalls()
-            
-            # İnşaat alanlarını güncelle
-            for site in self.building_sites[:]:  # Kopyasını kullan (döngü esnasında liste değişebilir)
-                if hasattr(site, 'update'):
-                    if not site.update():
-                        # İnşaat tamamlandı veya silindi, listeden çıkar
-                        if site in self.building_sites:
-                            self.building_sites.remove(site)
             
             # Periyodik olarak rastgele diyalog oluştur (her 60 saniyede bir)
             current_time = time.time()
@@ -1765,6 +1771,9 @@ class GameController(QObject):
     def create_cows(self):
         """İnekleri oluştur - Ahır ile balya arasındaki çitlerin arkasında"""
         try:
+            # Önceki inekleri temizle
+            self.cows = []
+            
             # Ahırın konumu ve boyutları
             church_x = 520
             church_width = 90
@@ -1785,16 +1794,23 @@ class GameController(QObject):
             min_x = fence_start_x + cow_width
             max_x = fence_end_x - cow_width
             
+            # İneklerin başlangıç pozisyonları (aralarında düzgün mesafe bırak)
+            cow_spacing = (max_x - min_x) / 3  # Uygun aralık
+            
+            # Pozisyonlar belirle (merkez noktalar)
+            pos1 = min_x + cow_spacing
+            pos2 = max_x - cow_spacing
+            
             # İki inek oluştur
-            for i in range(2):
-                # Rastgele başlangıç pozisyonu
-                start_x = random.uniform(min_x, max_x)
-                
-                # İneği oluştur ve listeye ekle
-                cow = Cow(x=start_x, y=self.ground_y, min_x=min_x, max_x=max_x)
-                self.cows.append(cow)
-                
-            print(f"{len(self.cows)} inek oluşturuldu")
+            cow1 = Cow(x=pos1, y=self.ground_y, min_x=min_x, max_x=max_x)
+            self.cows.append(cow1)
+            print(f"İnek 1 oluşturuldu: x={pos1:.1f}, bölge={min_x:.1f}-{max_x:.1f}")
+            
+            cow2 = Cow(x=pos2, y=self.ground_y, min_x=min_x, max_x=max_x)
+            self.cows.append(cow2)
+            print(f"İnek 2 oluşturuldu: x={pos2:.1f}, bölge={min_x:.1f}-{max_x:.1f}")
+            
+            print(f"{len(self.cows)} inek oluşturuldu. Çitler arasındaki mesafe: {max_x-min_x:.1f} piksel")
             
         except Exception as e:
             print(f"HATA: İnek oluşturma hatası: {e}")
