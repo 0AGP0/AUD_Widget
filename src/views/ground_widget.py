@@ -425,13 +425,13 @@ class GroundWidget(QWidget):
             if self.game_controller and hasattr(self.game_controller, 'wolves'):
                 self.draw_wolves(painter)
             
-            # Çiti çiz - ahır ile balya arasına
-            if self.images["cit"]:
-                self.draw_fence(painter)
-            
             # İnekleri çiz - çitlerin arkasında
             if self.images["inek"]:
                 self.draw_cows(painter)
+                
+            # Çiti çiz - artık ineklerin ÖNÜNDE (üzerinde) görünecek
+            if self.images["cit"]:
+                self.draw_fence(painter)
             
             # ---- Yapıları çiz (hepsi ağaçlardan sonra) ----
             
@@ -1916,8 +1916,8 @@ class GroundWidget(QWidget):
                 return
             
             # İnek boyutlarını ayarla
-            cow_width = 35
-            cow_height = 35
+            cow_width = 16
+            cow_height = 16
             
             # İnek resmini ölçeklendir
             scaled_cow = self.images["inek"].scaled(cow_width, cow_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -1941,15 +1941,21 @@ class GroundWidget(QWidget):
             max_x = fence_end_x - cow_width
             
             # İneklerin Y pozisyonu (zemin üzerinde, çitlerin arkasında)
-            cow_y = self.height() - self.ground_height - cow_height + 15
+            cow_y = self.height() - self.ground_height - cow_height + 1
             
             # İnekleri çiz
             if hasattr(self.game_controller, 'cows'):
                 for cow in self.game_controller.cows:
-                    # İneğin yönünü kontrol et
+                    # Transformasyonu ayarla
                     transform = QTransform()
-                    if hasattr(cow, 'direction_x') and cow.direction_x < 0:  # Sola gidiyorsa
+                    
+                    # İneğin yönünü kontrol et - TERS ÇEVRİLDİ: direction_x > 0 ise yön sola, < 0 ise yön sağa
+                    if hasattr(cow, 'direction_x') and cow.direction_x > 0:  # Sağa gidiyorsa (ama resmi ters çevir)
                         transform.scale(-1, 1)  # Yatay eksende çevir
+                    
+                    # Eğilme animasyonu için döndürme uygula
+                    if hasattr(cow, 'rotation'):
+                        transform.rotate(cow.rotation)
                     
                     # Transformasyonu uygula (ölçeklendirilmiş resme)
                     transformed_cow = scaled_cow.transformed(transform)
@@ -1958,13 +1964,6 @@ class GroundWidget(QWidget):
                     x = int(cow.x - cow_width/2)
                     y = int(cow_y)
                     painter.drawPixmap(x, y, transformed_cow)
-                    
-                    # Hata ayıklama bilgisi için dikdörtgen çiz (geliştirme aşamasında yardımcı olur)
-                    if False:  # Gerekirse True yapılabilir
-                        painter.setPen(QPen(Qt.red, 1, Qt.DashLine))
-                        painter.drawRect(x, y, cow_width, cow_height)
-                        painter.setPen(QPen(Qt.blue, 1))
-                        painter.drawLine(int(cow.x), y, int(cow.x), y + cow_height)
             else:
                 print("UYARI: Game controller'da cows listesi bulunamadı")
             

@@ -1780,19 +1780,16 @@ class GameController(QObject):
             stable_x = church_x + church_width + 50
             stable_width = 80
             
-            # Balyanın konumu
+            # Balyanın konumu ve genişliği
             hay_bale_x = stable_x + stable_width + 60
+            hay_bale_width = 40  # Balyanın genişliği
             
-            # Çit sınırları
-            fence_start_x = stable_x + stable_width - 30
-            fence_end_x = hay_bale_x
+            # İneklerin hareket alanını genişlet: ahırın başlangıcından balyanın sonuna kadar
+            min_x = stable_x + 5  # Ahırın başlangıcından biraz içeride
+            max_x = hay_bale_x + hay_bale_width - 5  # Balyanın sonundan biraz içeride
             
             # İnek boyutları
             cow_width = 35
-            
-            # İneklerin hareket alanı sınırları
-            min_x = fence_start_x + cow_width
-            max_x = fence_end_x - cow_width
             
             # İneklerin başlangıç pozisyonları (aralarında düzgün mesafe bırak)
             cow_spacing = (max_x - min_x) / 3  # Uygun aralık

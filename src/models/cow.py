@@ -35,6 +35,15 @@ class Cow(QObject):
         self.animation_speed = 15  # Daha yavaş animasyon
         self.last_frame_time = time.time()
         
+        # Eğilme animasyonu özellikleri
+        self.rotation = 0.0  # Eğilme açısı
+        self.rotation_speed = 0.2  # Eğilme hızı
+        self.rotation_direction = 1  # Eğilme yönü (1: sağa, -1: sola)
+        self.last_rotation_time = 0.0  # Son eğilme zamanı
+        self.rotation_interval = 0.3  # Her 0.3 saniyede bir yön değişimi
+        self.max_rotation = 8.0  # Maksimum eğilme açısı
+        self.current_rotation = 0.0  # Mevcut eğilme açısı
+        
         # İnek kimliği
         self.cow_id = random.randint(1000, 9999)
         
@@ -109,6 +118,25 @@ class Cow(QObject):
                     self.animation_counter = 0
                     self.animation_frame = (self.animation_frame + 1) % 4
                 self.last_frame_time = current_time
+            
+            # Eğilme animasyonunu güncelle
+            if self.is_moving:
+                time_diff = current_time - self.last_rotation_time
+                
+                # Her rotation_interval sürede bir yön değiştir
+                if time_diff >= self.rotation_interval:
+                    self.rotation_direction *= -1
+                    self.last_rotation_time = current_time
+                
+                # Yumuşak geçiş için sinüs fonksiyonu kullan
+                progress = (time_diff / self.rotation_interval) * math.pi
+                target_rotation = math.sin(progress) * self.max_rotation * self.rotation_direction
+                self.current_rotation += (target_rotation - self.current_rotation) * self.rotation_speed
+                self.rotation = self.current_rotation
+            else:
+                # Duruyorsa yumuşak şekilde dik pozisyona dön
+                self.current_rotation += (0 - self.current_rotation) * self.rotation_speed * 2
+                self.rotation = self.current_rotation
             
             # Ara sıra hareket bilgisi
             if random.random() < 0.005:  # %0.5 ihtimalle
