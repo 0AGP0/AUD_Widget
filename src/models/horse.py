@@ -1,0 +1,151 @@
+from PyQt5.QtCore import QObject, pyqtSignal
+import random
+import time
+import math
+
+class Horse(QObject):
+    """At sınıfı"""
+    
+    def __init__(self, x: float, y: float, min_x: float, max_x: float):
+        super().__init__()
+        
+        # Temel özellikler
+        self.x = x
+        self.y = y
+        self.width = 45  # İnekten biraz daha büyük
+        self.height = 45  # İnekten biraz daha büyük
+        
+        # Hareket sistemi
+        self.speed = 0.35  # İnekten biraz daha hızlı
+        self.direction_x = random.choice([-1, 1])  # 1: sağa, -1: sola
+        self.is_moving = True
+        
+        # Hareket alanı - çit arasında
+        self.min_x = min_x
+        self.max_x = max_x
+        
+        # Dolaşma sistemi
+        self.target_x = 0
+        self.wander_counter = 0
+        self.max_wander_time = random.randint(150, 250)  # Hedef değişim sayacı
+        
+        # Animasyon
+        self.animation_frame = 0
+        self.animation_counter = 0
+        self.animation_speed = 12  # İnekten biraz daha hızlı animasyon
+        self.last_frame_time = time.time()
+        
+        # Eğilme animasyonu özellikleri
+        self.rotation = 0.0  # Eğilme açısı
+        self.rotation_speed = 0.25  # Eğilme hızı
+        self.rotation_direction = 1  # Eğilme yönü (1: sağa, -1: sola)
+        self.last_rotation_time = 0.0  # Son eğilme zamanı
+        self.rotation_interval = 0.3  # Her 0.3 saniyede bir yön değişimi
+        self.max_rotation = 6.0  # Maksimum eğilme açısı
+        self.current_rotation = 0.0  # Mevcut eğilme açısı
+        
+        # At kimliği
+        self.horse_id = random.randint(1000, 9999)
+        
+        print(f"At #{self.horse_id} oluşturuldu: x={self.x}, sınırlar={self.min_x}-{self.max_x}")
+        
+        # Başlangıçta rastgele bir hedef belirle
+        self.wander()
+    
+    def move_towards(self, target_x):
+        """Hedefe doğru hareket et"""
+        self.is_moving = True
+        
+        # Hareket adımı
+        move_step = self.speed
+        
+        # Hedef pozisyona göre yön belirle
+        if target_x > self.x:
+            self.direction_x = 1  # Sağa
+            self.x += move_step
+        else:
+            self.direction_x = -1  # Sola
+            self.x -= move_step
+        
+        # Sınırlara ulaşıldıysa
+        if self.x <= self.min_x:
+            self.x = self.min_x
+            self.direction_x = 1  # Sağa dön
+            print(f"At #{self.horse_id} sol sınıra ulaştı, sağa dönüyor")
+        elif self.x >= self.max_x:
+            self.x = self.max_x
+            self.direction_x = -1  # Sola dön
+            print(f"At #{self.horse_id} sağ sınıra ulaştı, sola dönüyor")
+    
+    def wander(self):
+        """Rastgele dolaş"""
+        # Yeni hedef belirle
+        distance = random.randint(30, 80)  # 30-80 piksel arasında bir mesafe (inekten daha uzak)
+        direction = random.choice([-1, 1])  # Rastgele yön
+        
+        # Mevcut konuma göre yeni hedef hesapla
+        new_x = self.x + (direction * distance)
+        
+        # Sınırlar içinde kalmasını sağla
+        new_x = max(self.min_x, min(self.max_x, new_x))
+        
+        # Hedefi ayarla
+        self.target_x = new_x
+        self.is_moving = True
+        
+        print(f"At #{self.horse_id} yeni hedef: {new_x} (mesafe: {distance}, yön: {direction})")
+    
+    def update(self):
+        """At güncelleme fonksiyonu"""
+        try:
+            # Dolaşma sayacını artır
+            self.wander_counter += 1
+            
+            # Belirli aralıklarla yeni hedef belirle
+            if self.wander_counter >= self.max_wander_time or abs(self.x - self.target_x) < 2:
+                self.wander_counter = 0
+                self.max_wander_time = random.randint(150, 250)  # Yeni bir bekleme süresi
+                self.wander()  # Yeni hedef
+            
+            # Hedefe doğru hareket et
+            self.move_towards(self.target_x)
+            
+            # Animasyon güncelleme
+            current_time = time.time()
+            if current_time - self.last_frame_time >= 0.18:  # Her 180ms'de bir (inekten biraz daha hızlı)
+                self.animation_counter += 1
+                if self.animation_counter >= self.animation_speed:
+                    self.animation_counter = 0
+                    self.animation_frame = (self.animation_frame + 1) % 4
+                self.last_frame_time = current_time
+            
+            # Eğilme animasyonunu güncelle
+            if self.is_moving:
+                time_diff = current_time - self.last_rotation_time
+                
+                # Her rotation_interval sürede bir yön değiştir
+                if time_diff >= self.rotation_interval:
+                    self.rotation_direction *= -1
+                    self.last_rotation_time = current_time
+                
+                # Yumuşak geçiş için sinüs fonksiyonu kullan
+                progress = (time_diff / self.rotation_interval) * math.pi
+                target_rotation = math.sin(progress) * self.max_rotation * self.rotation_direction
+                self.current_rotation += (target_rotation - self.current_rotation) * self.rotation_speed
+                self.rotation = self.current_rotation
+            else:
+                # Duruyorsa yumuşak şekilde dik pozisyona dön
+                self.current_rotation += (0 - self.current_rotation) * self.rotation_speed * 2
+                self.rotation = self.current_rotation
+            
+            # Ara sıra hareket bilgisi
+            if random.random() < 0.005:  # %0.5 ihtimalle
+                print(f"At #{self.horse_id} hareket ediyor: x={self.x:.1f}, hedef={self.target_x}, yön={self.direction_x}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"HATA: At güncelleme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            return False 

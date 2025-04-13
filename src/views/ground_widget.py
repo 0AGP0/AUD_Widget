@@ -60,7 +60,9 @@ class GroundWidget(QWidget):
             "fici": None,      # Fıçı resmi
             "saman": None,      # Saman resmi
             "korkuluk": None,    # Korkuluk resmi
-            "inek": None        # İnek resmi
+            "inek": None,        # İnek resmi
+            "demirci": None,      # Demirci resmi
+            "at": None          # At resmi
         }
         
         # Resimleri yükle
@@ -101,7 +103,9 @@ class GroundWidget(QWidget):
                 "fici": None,      # Fıçı resmi
                 "saman": None,      # Saman resmi
                 "korkuluk": None,    # Korkuluk resmi
-                "inek": None        # İnek resmi
+                "inek": None,        # İnek resmi
+                "demirci": None,      # Demirci resmi
+                "at": None          # At resmi
             }
             
             # Ağaç resimlerini yükle
@@ -325,6 +329,22 @@ class GroundWidget(QWidget):
                 print(f"İnek resmi yüklendi: {inek_path}")
             else:
                 print(f"UYARI: İnek resmi bulunamadı: {inek_path}")
+                
+            # At resmini yükle
+            at_path = os.path.join("src", "assets", "at.png")
+            if os.path.exists(at_path):
+                self.images["at"] = QPixmap(at_path)
+                print(f"At resmi yüklendi: {at_path}")
+            else:
+                print(f"UYARI: At resmi bulunamadı: {at_path}")
+                
+            # Demirci resmini yükle
+            demirci_path = os.path.join("src", "assets", "demirci.png")
+            if os.path.exists(demirci_path):
+                self.images["demirci"] = QPixmap(demirci_path)
+                print(f"Demirci resmi yüklendi: {demirci_path}")
+            else:
+                print(f"UYARI: Demirci resmi bulunamadı: {demirci_path}")
             
             print("Resimler yüklendi")
             # Resimlerin yüklendiğini işaretle
@@ -426,10 +446,14 @@ class GroundWidget(QWidget):
                 self.draw_wolves(painter)
             
             # İnekleri çiz - çitlerin arkasında
-            if self.images["inek"]:
+            if self.game_controller and hasattr(self.game_controller, 'cows'):
                 self.draw_cows(painter)
                 
-            # Çiti çiz - artık ineklerin ÖNÜNDE (üzerinde) görünecek
+            # Atları çiz - çitlerin arkasında
+            if self.game_controller and hasattr(self.game_controller, 'horses'):
+                self.draw_horses(painter)
+            
+            # Çiti çiz - ineklerin ve atların ÖNÜNDE (üzerinde) görünecek
             if self.images["cit"]:
                 self.draw_fence(painter)
             
@@ -442,6 +466,10 @@ class GroundWidget(QWidget):
             # Kiliseyi çiz
             if self.images["kilise"]:
                 self.draw_church(painter)
+            
+            # Demirciyi çiz
+            if self.images["demirci"]:
+                self.draw_blacksmith(painter)
             
             # Kilisenin yanındaki fıçıyı çiz
             if self.images["fici"]:
@@ -614,8 +642,8 @@ class GroundWidget(QWidget):
             # Kilise resmini ölçeklendir
             scaled_church = self.images["kilise"].scaled(church_width, church_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
-            # Kalenin konumundan 300 piksel sağda
-            church_x = 520  # Kale 10 pikselde başlıyor
+            # Gardiyan kulesinin konumu olan 870 pozisyonuna yerleştir (gardiyan 70 piksel sağa taşınacak)
+            church_x = 870  
             
             # Y pozisyonunu hesapla (zemin üzerinde)
             church_y = self.height() - self.ground_height - church_height + 10
@@ -627,6 +655,36 @@ class GroundWidget(QWidget):
             
         except Exception as e:
             print(f"HATA: Kilise çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def draw_blacksmith(self, painter):
+        """Demirci binasını çiz"""
+        try:
+            if not self.images["demirci"]:
+                print("UYARI: Demirci resmi yüklenmemiş")
+                return
+            
+            # Demirci boyutlarını ayarla
+            blacksmith_width = 90
+            blacksmith_height = 90
+            
+            # Demirci resmini ölçeklendir
+            scaled_blacksmith = self.images["demirci"].scaled(blacksmith_width, blacksmith_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Kilisenin eski konumuna yerleştir
+            blacksmith_x = 520
+            
+            # Y pozisyonunu hesapla (zemin üzerinde)
+            blacksmith_y = self.height() - self.ground_height - blacksmith_height + 15
+            
+            # Demirciyi çiz
+            painter.drawPixmap(blacksmith_x, blacksmith_y, scaled_blacksmith)
+            
+            print(f"Demirci çizildi: Konum=({blacksmith_x}, {blacksmith_y}), Boyut={blacksmith_width}x{blacksmith_height}")
+            
+        except Exception as e:
+            print(f"HATA: Demirci çizme hatası: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1200,11 +1258,10 @@ class GroundWidget(QWidget):
             # Gardiyan resmini ölçeklendir
             scaled_guard = self.images["gardiyan"].scaled(guard_width, guard_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
-            # Kalenin sağında, kilise ve pazarın sonrasında olsun
-            # Kilise 310'da, pazar yaklaşık 400, tezgahlar 660'a kadar
-            guard_x = 870  # Kilise ve pazardan sonra
+            # Gardiyan kulesini 70 piksel sağa taşı
+            guard_x = 940  # Önceki konum 870 + 70 piksel
             
-            # Y pozisyonunu kilise ile aynı seviyede hesapla (kilise Y=955'te çiziliyor)
+            # Y pozisyonunu kilise ile aynı seviyede hesapla
             guard_y = self.height() - self.ground_height - guard_height + 20
             
             # Gardiyanı çiz
@@ -1231,11 +1288,8 @@ class GroundWidget(QWidget):
             # Değirmen resmini ölçeklendir
             scaled_mill = self.images["degirmen"].scaled(mill_width, mill_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
-            # Gardiyan kulesinin konumu
-             # draw_guard metodundan alındı
-            
-            # Değirmeni gardiyanın 40 piksel soluna yerleştir
-            mill_x = 1050
+            # Değirmeni yeni gardiyan konumuna göre yerleştir
+            mill_x = 1120  # Önceki değer 1050 + 70 piksel (gardiyanın kaydırılma miktarı)
             
             # Y pozisyonunu hesapla (zemin üzerinde)
             mill_y = self.height() - self.ground_height - mill_height + 1
@@ -1469,7 +1523,7 @@ class GroundWidget(QWidget):
             
             # Duvarın başlangıç ve bitiş noktalarını belirle
             start_x = 0  # En soldan başla
-            end_x = 900  # Gardiyan kulesine kadar
+            end_x = 990  # Yeni gardiyan konumu (940) + küçük bir ekleme
             
             # Duvarın y pozisyonu - zemin üzerinde, köylülerin yürüdüğü seviyede
             wall_y = self.height() - self.ground_height - duvar_height + 4
@@ -1545,10 +1599,10 @@ class GroundWidget(QWidget):
             painter.drawPixmap(int(fener3_x), int(fener_y), scaled_fener)
             print(f"Fener 3 çizildi: Konum=({int(fener3_x)}, {int(fener_y)})")
             
-            # 4. Fener: Kilisenin 6 piksel sağı (AYNALANIYOR)
-            church_x = 520  # draw_church metodundan
-            church_width = 85  # draw_church metodundan
-            fener4_x = church_x + church_width + 6
+            # 4. Fener: Demircinin 6 piksel sağı (AYNALANIYOR) - Artık kilise değil demirci oldu
+            blacksmith_x = 520  # draw_blacksmith metodundan
+            blacksmith_width = 90  # draw_blacksmith metodundan
+            fener4_x = blacksmith_x + blacksmith_width + 6
             painter.drawPixmap(int(fener4_x), int(fener_y), mirrored_fener)  # Aynalanan fener kullanılıyor
             print(f"Fener 4 çizildi (aynalı): Konum=({int(fener4_x)}, {int(fener_y)})")
             
@@ -1558,7 +1612,7 @@ class GroundWidget(QWidget):
             traceback.print_exc()
 
     def draw_stable(self, painter):
-        """Ahırı çiz - Kilisenin 50 piksel sağında"""
+        """Ahırı çiz - Demircinin 50 piksel sağında"""
         try:
             if not self.images["ahir"]:
                 print("UYARI: Ahır resmi yüklenmemiş")
@@ -1571,12 +1625,12 @@ class GroundWidget(QWidget):
             # Ahır resmini ölçeklendir
             scaled_stable = self.images["ahir"].scaled(stable_width, stable_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
-            # Kilisenin konumu ve genişliği (draw_church metodundan)
-            church_x = 520
-            church_width = 90
+            # Demircinin konumu ve genişliği (draw_blacksmith metodundan)
+            blacksmith_x = 520
+            blacksmith_width = 90
             
-            # Ahırın konumunu hesapla (kilisenin 50 piksel sağı)
-            stable_x = church_x + church_width + 50
+            # Ahırın konumunu hesapla (demircinin 50 piksel sağı)
+            stable_x = blacksmith_x + blacksmith_width + 50
             
             # Y pozisyonunu hesapla (zemin üzerinde, diğer yapılarla hizalı)
             stable_y = self.height() - self.ground_height - stable_height + 12
@@ -1606,9 +1660,9 @@ class GroundWidget(QWidget):
             scaled_hay_bale = self.images["balya"].scaled(hay_bale_width, hay_bale_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
             # Ahırın konumu ve genişliği (draw_stable metodundan)
-            church_x = 520
-            church_width = 90
-            stable_x = church_x + church_width + 50  # Kilisenin 50 piksel sağı
+            blacksmith_x = 520  # Demirci konumu
+            blacksmith_width = 90  # Demirci genişliği
+            stable_x = blacksmith_x + blacksmith_width + 50  # Demircinin 50 piksel sağı
             stable_width = 80  # Ahır genişliği
             
             # Balyanın konumunu hesapla (ahırın 100 piksel sağı)
@@ -1643,41 +1697,35 @@ class GroundWidget(QWidget):
             scaled_cit = self.images["cit"].scaled(cit_width, cit_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
             # Ahırın konumu ve boyutları (draw_stable metodundan)
-            church_x = 520
-            church_width = 90
-            stable_x = church_x + church_width + 50  # Kilisenin 50 piksel sağı
+            blacksmith_x = 520
+            blacksmith_width = 90
+            stable_x = blacksmith_x + blacksmith_width + 50  # Demircinin 50 piksel sağı
             stable_width = 80  # Ahır genişliği
             
             # Balyanın konumu (draw_hay_bale metodundan)
-            hay_bale_x = stable_x + stable_width + 60
+            hay_bale_x = stable_x + stable_width + 80
             
             # İlk çit dizisi: Ahır ile balya arasında
-            # Çitin başlangıç ve bitiş noktalarını belirle
-            start_x = stable_x + stable_width - 30  # Ahırın bitişinden başla
-            end_x = hay_bale_x  # Balyanın başlangıcında bitir
+            fence_start_x = stable_x + stable_width - 30
+            fence_end_x = hay_bale_x
             
-            # Çitin y pozisyonu - zemin üzerinde
+            # Çit Y pozisyonu (zemin üzerinde)
             fence_y = self.height() - self.ground_height - cit_height + 15
             
-            # Çit parçalarını üst üste bindirerek çiz
-            # Her parçayı bir öncekiyle %30 üst üste binerek yerleştir
-            overlap = int(cit_width * 0.3)  # %30 üst üste binme
-            step = cit_width - overlap
-            
-            # İlk çit dizisi için parça sayısını hesapla
-            fence_width = end_x - start_x
-            tile_count = int(fence_width / step) + 1
+            # Çit dizisi için parça sayısını hesapla
+            fence_width = fence_end_x - fence_start_x
+            step = cit_width - 10  # Her 20 pikselde bir çit (10 piksel örtüşme)
+            tile_count = int(fence_width / step) + 1  # +1 ekstra çit eklemek için
             
             # İlk çit dizisini çiz
             for i in range(tile_count):
-                x = start_x + (i * step)
+                x = fence_start_x + (i * step)
                 painter.drawPixmap(int(x), int(fence_y), scaled_cit)
             
             print(f"İlk çit dizisi çizildi: {tile_count} adet parça")
             
-            # İkinci çit dizisi: Değirmenin yanında
             # Değirmenin konumu (draw_mill metodundan)
-            mill_x = 1050
+            mill_x = 1120  # Değirmenin yeni konumu
             mill_width = 110
             
             # İkinci çit dizisinin başlangıç ve bitiş noktaları
@@ -1757,7 +1805,7 @@ class GroundWidget(QWidget):
             guard_width = 130  # Gardiyan kulesi genişliği
             
             # Meşalenin konumunu hesapla (gardiyan kulesinin 2 piksel sağı)
-            torch_x = guard_x + guard_width - 63
+            torch_x = guard_x + guard_width
             
             # Y pozisyonunu hesapla (zemin üzerinde, diğer yapılarla hizalı)
             torch_y = self.height() - self.ground_height - torch_height
@@ -1820,9 +1868,9 @@ class GroundWidget(QWidget):
             scaled_hay = self.images["saman"].scaled(hay_width, hay_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
             # Ahırın konumu (draw_stable metodundan)
-            church_x = 520
-            church_width = 90
-            stable_x = church_x + church_width + 50  # Kilisenin 50 piksel sağı
+            blacksmith_x = 520
+            blacksmith_width = 90
+            stable_x = blacksmith_x + blacksmith_width + 50  # Demircinin 50 piksel sağı
             
             # Samanın konumunu hesapla (ahırın hemen solunda)
             hay_x = stable_x - hay_width + 5
@@ -1855,7 +1903,7 @@ class GroundWidget(QWidget):
             scaled_barrel = self.images["fici"].scaled(barrel_width, barrel_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
             # Kilisenin konumu (draw_church metodundan)
-            church_x = 520
+            church_x = 870  # Kilisenin yeni konumu
             church_width = 90
             
             # Fıçının konumunu hesapla (kilisenin hemen sağında)
@@ -1889,7 +1937,7 @@ class GroundWidget(QWidget):
             scaled_scarecrow = self.images["korkuluk"].scaled(scarecrow_width, scarecrow_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
             # Değirmenin konumu (draw_mill metodundan)
-            mill_x = 1050
+            mill_x = 1120  # Değirmenin yeni konumu
             mill_width = 110
             
             # Korkuluğun konumunu hesapla (değirmenin 120 piksel sağı)
@@ -1909,39 +1957,38 @@ class GroundWidget(QWidget):
             traceback.print_exc()
 
     def draw_cows(self, painter):
-        """İnekleri çiz - Çitlerin arkasında dolaşacak şekilde"""
+        """İnekleri çiz - Değirmenin yanındaki çitlerin arkasında"""
         try:
             if not self.images["inek"]:
                 print("UYARI: İnek resmi yüklenmemiş")
                 return
             
             # İnek boyutlarını ayarla
-            cow_width = 16
-            cow_height = 16
+            cow_width = 18
+            cow_height = 18
             
             # İnek resmini ölçeklendir
             scaled_cow = self.images["inek"].scaled(cow_width, cow_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             
-            # Çit sınırlarını al (draw_fence metodundan)
-            # Ahırın konumu ve boyutları
-            church_x = 520
-            church_width = 90
-            stable_x = church_x + church_width + 50
-            stable_width = 80
+            # Değirmenin konumu (draw_mill metodundan)
+            mill_x = 1120  # Değirmenin yeni konumu
+            mill_width = 110
             
-            # Balyanın konumu
-            hay_bale_x = stable_x + stable_width + 60
-            
-            # Çit sınırları
-            fence_start_x = stable_x + stable_width - 30
-            fence_end_x = hay_bale_x
+            # İkinci çit dizisinin başlangıç ve bitiş noktaları
+            fence_start_x = mill_x + mill_width - 30  # Değirmenin bitişinden başla
+            fence_end_x = fence_start_x + 150  # 150 piksel devam etsin
             
             # İneklerin hareket alanı sınırları
             min_x = fence_start_x + cow_width
             max_x = fence_end_x - cow_width
             
-            # İneklerin Y pozisyonu (zemin üzerinde, çitlerin arkasında)
-            cow_y = self.height() - self.ground_height - cow_height + 1
+            # Çit yüksekliği ve Y pozisyonu (draw_fence metodundan)
+            cit_height = 35
+            fence_y = self.height() - self.ground_height - cit_height + 15
+            
+            # İneklerin Y pozisyonu (çitlerin arkasında, daha yüksekte)
+            # Yüksekliği, çitin Y pozisyonuna göre ayarla, çitin üst kısmının biraz altında olacak şekilde
+            cow_y = fence_y + 1
             
             # İnekleri çiz
             if hasattr(self.game_controller, 'cows'):
@@ -1969,5 +2016,70 @@ class GroundWidget(QWidget):
             
         except Exception as e:
             print(f"HATA: İnek çizme hatası: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_horses(self, painter):
+        """Atları çiz - Ahır ile balya arasındaki çitlerin arkasında"""
+        try:
+            if not self.images["at"]:
+                print("UYARI: At resmi yüklenmemiş")
+                return
+            
+            # At boyutlarını ayarla
+            horse_width = 24
+            horse_height = 24
+            
+            # At resmini ölçeklendir
+            scaled_horse = self.images["at"].scaled(horse_width, horse_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Çit sınırlarını al (draw_fence metodundan)
+            # Ahırın konumu ve boyutları
+            blacksmith_x = 520  # Demirci konumu
+            blacksmith_width = 90
+            stable_x = blacksmith_x + blacksmith_width + 50  # Demircinin 50 piksel sağı
+            stable_width = 80
+            
+            # Balyanın konumu
+            hay_bale_x = stable_x + stable_width + 80
+            
+            # Çit sınırları
+            fence_start_x = stable_x + stable_width - 30
+            fence_end_x = hay_bale_x
+            
+            # Çit yüksekliği ve Y pozisyonu (draw_fence metodundan)
+            cit_height = 35
+            fence_y = self.height() - self.ground_height - cit_height + 15
+            
+            # Atların Y pozisyonu (çitlerin arkasında, daha yüksekte)
+            # Yüksekliği, çitin Y pozisyonuna göre ayarla, çitin üst kısmının biraz altında olacak şekilde
+            horse_y = fence_y - 3
+            
+            # Atları çiz
+            if hasattr(self.game_controller, 'horses'):
+                for horse in self.game_controller.horses:
+                    # Transformasyonu ayarla
+                    transform = QTransform()
+                    
+                    # Atın yönünü kontrol et - DÜZELTİLDİ: İneklerin tam tersi, direction_x < 0 ise yön sola (aynalama), > 0 ise yön sağa
+                    if hasattr(horse, 'direction_x') and horse.direction_x < 0:  # Sola gidiyorsa resmi ters çevir
+                        transform.scale(-1, 1)  # Yatay eksende çevir
+                    
+                    # Eğilme animasyonu için döndürme uygula
+                    if hasattr(horse, 'rotation'):
+                        transform.rotate(horse.rotation)
+                    
+                    # Transformasyonu uygula (ölçeklendirilmiş resme)
+                    transformed_horse = scaled_horse.transformed(transform)
+                    
+                    # Atı pozisyona çiz - burada horse.x değeri önemli
+                    x = int(horse.x - horse_width/2)
+                    y = int(horse_y)
+                    painter.drawPixmap(x, y, transformed_horse)
+            else:
+                print("UYARI: Game controller'da horses listesi bulunamadı")
+            
+        except Exception as e:
+            print(f"HATA: At çizme hatası: {e}")
             import traceback
             traceback.print_exc()

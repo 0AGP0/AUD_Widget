@@ -19,6 +19,7 @@ from ..models.market import Market, MarketStall
 from ..models.cow import Cow
 from ..models.ai.dialogue.dialogue_manager import DialogueManager
 from ..utils.constants import MALE_NAMES, FEMALE_NAMES, PROFESSIONS
+from ..models.horse import Horse
 
 class GameController(QObject):
     """Oyun kontrolcü sınıfı"""
@@ -60,6 +61,7 @@ class GameController(QObject):
         self.wolves = []
         self.birds = []
         self.cows = []  # İnekler listesi eklendi
+        self.horses = []  # Atlar listesi eklendi
         self.structures = []  # Yapılar listesi eklendi
         
         # Kurt oluşturma parametreleri
@@ -198,6 +200,11 @@ class GameController(QObject):
             print(f"İnek 1 pozisyon: x={self.cows[0].x if self.cows else 'yok'}, "
                   f"min_x={self.cows[0].min_x if self.cows else 'yok'}, "
                   f"max_x={self.cows[0].max_x if self.cows else 'yok'}")
+            
+            # Atları oluştur
+            print("Atlar oluşturuluyor...")
+            self.create_horses()
+            print(f"{len(self.horses)} at oluşturuldu")
             
             # Kontrol panelini güncelle
             print("Kontrol paneli güncelleniyor...")
@@ -541,6 +548,9 @@ class GameController(QObject):
             # İnekleri güncelle
             self.update_cows()
             
+            # Atları güncelle
+            self.update_horses()
+            
             # Pazar tezgahlarını güncelle
             self.update_market_stalls()
             
@@ -731,6 +741,23 @@ class GameController(QObject):
                 # Köylüleri dolaşmaya başlat
                 if hasattr(self, 'start_villagers_wandering'):
                     self.start_villagers_wandering()
+                    
+                # Gündüz başladığında kurt sayısını sınırla
+                # Kurtların çoğunu mağaraya gönder
+                max_daytime_wolves = 2  # Gündüz en fazla 2 kurt olsun
+                if hasattr(self, 'wolves') and len(self.wolves) > max_daytime_wolves:
+                    # Kaç kurt kalacak hesapla
+                    wolves_to_keep = min(max_daytime_wolves, len(self.wolves))
+                    wolves_to_remove = len(self.wolves) - wolves_to_keep
+                    
+                    # Kurtları rastgele seç ve kaldır
+                    for _ in range(wolves_to_remove):
+                        if self.wolves:
+                            wolf_to_remove = random.choice(self.wolves)
+                            self.wolves.remove(wolf_to_remove)
+                            print(f"Kurt #{wolf_to_remove.wolf_id} gündüz olduğu için mağaraya geri döndü.")
+                    
+                    print(f"Gündüz oldu: {wolves_to_remove} kurt mağaraya geri döndü, {len(self.wolves)} kurt dışarıda kaldı.")
             else:
                 # Gece başladığında köylüleri kaleye döndür
                 if hasattr(self, 'return_villagers_to_castle'):
@@ -865,42 +892,21 @@ class GameController(QObject):
             # Zemin seviyesini kullan
             ground_y = self.ground_y
             
-            # Diğer yapılarla çakışma kontrolü
-            MIN_BUILDING_DISTANCE = min_distance  # Yapılar arası minimum mesafe (parametreden alınıyor)
-            
-            # Diğer inşaat alanlarıyla çakışıyor mu kontrol et
-            for building_site in self.building_sites:
-                distance = abs(building_site.x - x)
-                if distance < MIN_BUILDING_DISTANCE:
-                    print(f"İnşaat alanı oluşturulamadı: Başka bir inşaat alanına çok yakın! Mesafe: {distance} < {MIN_BUILDING_DISTANCE}")
-                    return None
-            
-            # Evlerle çakışıyor mu kontrol et
-            for house in self.houses:
-                distance = abs(house.x - x)
-                if distance < MIN_BUILDING_DISTANCE:
-                    print(f"İnşaat alanı oluşturulamadı: Bir eve çok yakın! Mesafe: {distance} < {MIN_BUILDING_DISTANCE}")
-                    return None
-            
-            # Diğer özel yapılarla çakışıyor mu kontrol et (kale, kilise, pazar vs.)
-            if hasattr(self, 'castle') and self.castle:
-                distance = abs(self.castle.x - x)
-                if distance < MIN_BUILDING_DISTANCE:
-                    print(f"İnşaat alanı oluşturulamadı: Kaleye çok yakın! Mesafe: {distance} < {MIN_BUILDING_DISTANCE}")
-                    return None
-            
-            # Kilise konumu yaklaşık olarak 310
-            distance_to_church = abs(310 - x)
-            if distance_to_church < MIN_BUILDING_DISTANCE:
-                print(f"İnşaat alanı oluşturulamadı: Kiliseye çok yakın! Mesafe: {distance_to_church} < {MIN_BUILDING_DISTANCE}")
-                return None
-            
-            # Pazar yeri kontrolü
-            if hasattr(self, 'market') and self.market:
-                distance = abs(self.market.x - x)
-                if distance < MIN_BUILDING_DISTANCE:
-                    print(f"İnşaat alanı oluşturulamadı: Pazar yerine çok yakın! Mesafe: {distance} < {MIN_BUILDING_DISTANCE}")
-                    return None
+            # Kaleden 2500 piksel uzaklıktan başla ve her ev arasında 15 piksel olsun
+            if not hasattr(self, 'last_building_site_x'):
+                # İlk inşaat alanı için başlangıç noktası (kaleden 2500 piksel uzakta)
+                if self.castle:
+                    self.last_building_site_x = self.castle.x + 1450
+                else:
+                    self.last_building_site_x = 1450  # Kale yoksa varsayılan olarak 2500
+                
+                # Parametreyi görmezden gel ve hesaplanan konumu kullan
+                x = self.last_building_site_x
+            else:
+                # Sonraki inşaat alanları için son alandan 15 piksel uzakta olacak şekilde yerleştir
+                # Varsayılan inşaat alanı genişliğini kullan
+                self.last_building_site_x += 15 + 60  # 60 varsayılan genişlik + 15 piksel mesafe
+                x = self.last_building_site_x
             
             # İnşaat alanını oluştur (zemin seviyesinde)
             building_site = BuildingSite(x=x, y=ground_y)
@@ -928,9 +934,23 @@ class GameController(QObject):
             # Zemin seviyesini hesapla
             ground_y = self.ground_y + 35
             
-            # Ev oluştur - y değerini zemin seviyesi olarak ayarla
+            # Kaleden 2500 piksel uzaklıkta yerleştirmeyi kontrol et
+            if not hasattr(self, 'last_house_x'):
+                # İlk ev için başlangıç noktası (kaleden 2500 piksel uzakta)
+                if self.castle:
+                    self.last_house_x = self.castle.x + 1450
+                else:
+                    self.last_house_x = 1450  # Kale yoksa varsayılan olarak 2500
+                
+                house_x = self.last_house_x
+            else:
+                # Sonraki evler için son evden 15 piksel uzakta olacak şekilde yerleştir
+                self.last_house_x += 15 + building_site.width  # Ev genişliği + 15 piksel mesafe
+                house_x = self.last_house_x
+            
+            # Ev oluştur - x ve y değerlerini ayarla
             house = House(
-                x=building_site.x,
+                x=house_x,  # Yeni hesaplanan x değeri
                 y=ground_y,  # Zemin seviyesine yerleştir
                 width=building_site.width,
                 height=building_site.height,
@@ -1178,7 +1198,8 @@ class GameController(QObject):
     def create_wolves(self, num_wolves=5):
         """Kurtları oluştur"""
         try:
-            # Kurtları temizle
+            # Kurtları temizle - değişiklik yapmadan önce temizlemeyi yazdıralım
+            print(f"Kurtlar temizleniyor. Önceki kurt sayısı: {len(self.wolves)}")
             self.wolves = []
             
             # Mağara konumunu bul
@@ -1197,8 +1218,11 @@ class GameController(QObject):
             if hasattr(self, 'castle') and self.castle:
                 castle_x = self.castle.x
             
+            # Maksimum kurt sayısını kontrolü
+            actual_num_wolves = min(num_wolves, 5)  # En fazla 5 kurt oluştur
+            
             # Belirtilen sayıda kurt oluştur
-            for i in range(num_wolves):
+            for i in range(actual_num_wolves):
                 # Mağaranın etrafında rastgele x pozisyonu
                 wolf_x = cave_x + random.randint(-200, 200)
                 
@@ -1223,7 +1247,7 @@ class GameController(QObject):
                 self.wolves.append(wolf)
                 print(f"Kurt {i+1} oluşturuldu: x={wolf_x}, y={self.ground_y}, cave_x={cave_x}, min_x={wolf.min_x}")
                 
-            print(f"Toplam {num_wolves} kurt oluşturuldu")
+            print(f"Toplam {len(self.wolves)} kurt oluşturuldu")
                 
         except Exception as e:
             print(f"HATA: Kurt oluşturma hatası: {e}")
@@ -1347,6 +1371,12 @@ class GameController(QObject):
     def spawn_wolf(self):
         """Yeni kurt oluştur"""
         try:
+            # Maksimum kurt sayısını kontrol et
+            max_wolves = 5
+            if len(self.wolves) >= max_wolves:
+                print(f"Kurt sayısı maksimum ({max_wolves}) seviyesine ulaştı, yeni kurt oluşturulmadı.")
+                return None
+            
             # Mağara yakınında rastgele bir konum belirle
             if self.cave:
                 # Mağaranın etrafında rastgele bir konum
@@ -1366,18 +1396,31 @@ class GameController(QObject):
             
             # Kurt nesnesini oluştur
             from src.models.wolf import Wolf
-            wolf = Wolf(x=x, y=y)
+            wolf = Wolf(
+                wolf_id=len(self.wolves) + 1,  # Sıradaki ID'yi kullan
+                x=x,
+                y=y,
+                width=40,
+                height=30
+            )
             
-            # Kurt özelliklerini ayarla
-            wolf.width = 40
-            wolf.height = 30
-            wolf.direction = 1  # Varsayılan olarak sağa doğru
-            wolf.animation_frame = 1
+            # Game controller'ı ayarla
+            if hasattr(wolf, 'set_game_controller'):
+                wolf.set_game_controller(self)
+            
+            # Mağara konumunu ayarla
+            if hasattr(wolf, 'cave_x'):
+                wolf.cave_x = cave_x if hasattr(self, 'cave') and self.cave else self.width - 200
+            
+            # Köy sınırını ayarla
+            if hasattr(wolf, 'min_x'):
+                castle_x = self.castle.x if hasattr(self, 'castle') and self.castle else 0
+                wolf.min_x = castle_x + 500
             
             # Kurtu listeye ekle
             self.wolves.append(wolf)
             
-            print(f"Yeni kurt oluşturuldu: ID={wolf.wolf_id}, Konum=({x}, {y})")
+            print(f"Yeni kurt oluşturuldu: ID={wolf.wolf_id}, Konum=({x}, {y}), Toplam kurt sayısı: {len(self.wolves)}")
             return wolf
             
         except Exception as e:
@@ -1533,11 +1576,30 @@ class GameController(QObject):
                 # Kurtları güncelle
                 self.update_wolves()
                 
-                # Her 5 saniyede bir yeni kurt oluşturma şansı
-                if current_time - self.last_wolf_spawn > self.wolf_spawn_interval:
+                # Maksimum kurt sayısını sınırla
+                max_wolves = 5  # En fazla 5 kurt olsun
+                
+                # Her 5 saniyede bir yeni kurt oluşturma şansı (eğer maksimum sayıya ulaşılmadıysa)
+                if len(self.wolves) < max_wolves and current_time - self.last_wolf_spawn > self.wolf_spawn_interval:
                     self.last_wolf_spawn = current_time
                     if random.random() < 0.2:  # %20 şans
                         self.spawn_wolf()
+            else:
+                # Gündüz olduğunda bazı kurtları kaldır (mağaraya geri döndür)
+                # Her gündüz döngüsünde kurtların yaklaşık yarısını kaldır
+                if self.wolves and hasattr(self, 'day_count'):
+                    # Yeni bir gün başladıysa
+                    if self.day_count > getattr(self, 'last_day_count', 0):
+                        self.last_day_count = self.day_count
+                        
+                        # Kurtların yarısını rastgele seç ve kaldır
+                        if len(self.wolves) > 2:  # En az 2 kurt kalsın
+                            wolves_to_remove = len(self.wolves) // 2
+                            for _ in range(wolves_to_remove):
+                                if self.wolves:  # Hala kurt varsa
+                                    wolf_to_remove = random.choice(self.wolves)
+                                    self.wolves.remove(wolf_to_remove)
+                                    print(f"Kurt #{wolf_to_remove.wolf_id} gündüz olduğu için mağaraya geri döndü.")
             
             # Kuşları güncelle
             self.update_birds()
@@ -1575,6 +1637,9 @@ class GameController(QObject):
             # İnekleri güncelle
             self.update_cows()
             
+            # Atları güncelle
+            self.update_horses()
+            
         except Exception as e:
             print(f"HATA: Oyun döngüsü hatası: {e}")
             import traceback
@@ -1586,6 +1651,11 @@ class GameController(QObject):
             # Kale yoksa çık
             if not self.castle:
                 return
+                
+            # Ev sayısı köylü sayısını aşmış mı kontrol et
+            if len(self.houses) + len(self.building_sites) >= len(self.villagers):
+                print(f"Ev sayısı ({len(self.houses) + len(self.building_sites)}) köylü sayısına ({len(self.villagers)}) eşit veya fazla. Yeni ev inşa edilmeyecek.")
+                return False
                 
             # Envanteri kontrol et
             wood_amount = self.castle.get_inventory().get('odun', 0)
@@ -1740,6 +1810,9 @@ class GameController(QObject):
             # İnekleri güncelle
             self.update_cows()
             
+            # Atları güncelle
+            self.update_horses()
+            
             # İnşaat alanlarını güncelle
             self.update_building_sites()
             
@@ -1769,24 +1842,18 @@ class GameController(QObject):
             traceback.print_exc()
 
     def create_cows(self):
-        """İnekleri oluştur - Ahır ile balya arasındaki çitlerin arkasında"""
+        """İnekleri oluştur"""
         try:
             # Önceki inekleri temizle
             self.cows = []
             
-            # Ahırın konumu ve boyutları
-            church_x = 520
-            church_width = 90
-            stable_x = church_x + church_width + 50
-            stable_width = 80
+            # Değirmenin konumu ve boyutları (inekler artık değirmenin yanındaki çitlerde olacak)
+            mill_x = 1120  # Değirmenin yeni konumu
+            mill_width = 110
             
-            # Balyanın konumu ve genişliği
-            hay_bale_x = stable_x + stable_width + 60
-            hay_bale_width = 40  # Balyanın genişliği
-            
-            # İneklerin hareket alanını genişlet: ahırın başlangıcından balyanın sonuna kadar
-            min_x = stable_x + 5  # Ahırın başlangıcından biraz içeride
-            max_x = hay_bale_x + hay_bale_width - 5  # Balyanın sonundan biraz içeride
+            # İkinci çit dizisinin başlangıç ve bitiş noktaları (ground_widget.py draw_fence() metodundan)
+            min_x = mill_x + mill_width - 30  # Değirmenin bitişinden başla
+            max_x = min_x + 150  # 150 piksel devam etsin
             
             # İnek boyutları
             cow_width = 35
@@ -1811,6 +1878,62 @@ class GameController(QObject):
             
         except Exception as e:
             print(f"HATA: İnek oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def create_horses(self):
+        """Atları oluştur - Ahır ile balya arasındaki çitlerin arkasında"""
+        try:
+            # Önceki atları temizle
+            self.horses = []
+            
+            # Ahırın konumu ve boyutları (atlar ineklerin eski yerinde olacak)
+            blacksmith_x = 520  # Demirci konumu
+            blacksmith_width = 90
+            stable_x = blacksmith_x + blacksmith_width + 50  # Demircinin 50 piksel sağı
+            stable_width = 80
+            
+            # Balyanın konumu ve genişliği
+            hay_bale_x = stable_x + stable_width + 80
+            hay_bale_width = 40  # Balyanın genişliği
+            
+            # Atların hareket alanını belirle: ahırın başlangıcından balyanın sonuna kadar
+            min_x = stable_x + 45  # Ahırın başlangıcından biraz içeride
+            max_x = hay_bale_x + hay_bale_width - 40  # Balyanın sonundan biraz içeride
+            
+            # At boyutları
+            horse_width = 45
+            
+            # Atların başlangıç pozisyonları (aralarında düzgün mesafe bırak)
+            horse_spacing = (max_x - min_x) / 3  # Uygun aralık
+            
+            # Pozisyonlar belirle (merkez noktalar)
+            pos1 = min_x + horse_spacing
+            pos2 = max_x - horse_spacing
+            
+            # İki at oluştur
+            horse1 = Horse(x=pos1, y=self.ground_y, min_x=min_x, max_x=max_x)
+            self.horses.append(horse1)
+            print(f"At 1 oluşturuldu: x={pos1:.1f}, bölge={min_x:.1f}-{max_x:.1f}")
+            
+            horse2 = Horse(x=pos2, y=self.ground_y, min_x=min_x, max_x=max_x)
+            self.horses.append(horse2)
+            print(f"At 2 oluşturuldu: x={pos2:.1f}, bölge={min_x:.1f}-{max_x:.1f}")
+            
+            print(f"{len(self.horses)} at oluşturuldu. Çitler arasındaki mesafe: {max_x-min_x:.1f} piksel")
+            
+        except Exception as e:
+            print(f"HATA: At oluşturma hatası: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def update_horses(self):
+        """Atları güncelle"""
+        try:
+            for horse in self.horses:
+                horse.update()
+        except Exception as e:
+            print(f"HATA: At güncelleme hatası: {e}")
             import traceback
             traceback.print_exc()
     
